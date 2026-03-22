@@ -42,7 +42,7 @@ final class SettingsPage {
                 <span class="dashicons dashicons-images-alt2"></span>
                 <?php echo esc_html__('FP Image Optimizer', 'fp-imgopt'); ?>
             </h2>
-            <p><?php echo esc_html__('Converte le immagini in WebP e AVIF per ridurre il peso e migliorare le performance.', 'fp-imgopt'); ?></p>
+            <p><?php echo esc_html__('Converte le immagini in WebP e AVIF per ridurre il peso e migliorare le performance. Le foto originali non vengono mai modificate.', 'fp-imgopt'); ?></p>
         </div>
         <span class="fpimgopt-page-header-badge">v<?php echo esc_html(FP_IMGOPT_VERSION); ?></span>
     </div>

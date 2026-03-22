@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.2] - 2025-03-22
+
+### Fixed
+
+- **WebP/AVIF**: validazione file convertiti (filesize > 100 byte) prima di servire
+- Se la conversione produce file corrotto/vuoto, viene eliminato e non servito
+- Non si sovrascrivono varianti WebP/AVIF già valide
+- Fallback sempre sull'immagine originale se le varianti non sono valide
+
 ## [1.1.1] - 2025-03-22
 
 ### Fixed

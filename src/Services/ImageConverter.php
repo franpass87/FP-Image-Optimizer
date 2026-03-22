@@ -143,15 +143,27 @@ final class ImageConverter {
 
         if ($do_webp) {
             $webp_path = $base . '.webp';
-            if ($this->save_webp($image, $webp_path)) {
+            if ($this->is_valid_image_file($webp_path)) {
                 $result['webp'] = true;
+            } elseif ($this->save_webp($image, $webp_path)) {
+                if ($this->is_valid_image_file($webp_path)) {
+                    $result['webp'] = true;
+                } else {
+                    @unlink($webp_path);
+                }
             }
         }
 
         if ($do_avif) {
             $avif_path = $base . '.avif';
-            if ($this->save_avif($image, $avif_path)) {
+            if ($this->is_valid_image_file($avif_path)) {
                 $result['avif'] = true;
+            } elseif ($this->save_avif($image, $avif_path)) {
+                if ($this->is_valid_image_file($avif_path)) {
+                    $result['avif'] = true;
+                } else {
+                    @unlink($avif_path);
+                }
             }
         }
 
@@ -163,6 +175,10 @@ final class ImageConverter {
     private function is_supported_source(string $path): bool {
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
         return in_array($ext, ['jpg', 'jpeg', 'png', 'gif'], true);
+    }
+
+    private function is_valid_image_file(string $path): bool {
+        return is_file($path) && filesize($path) > 100;
     }
 
     public function supports_webp(): bool {

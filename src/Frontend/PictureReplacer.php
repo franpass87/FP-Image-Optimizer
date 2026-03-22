@@ -137,12 +137,12 @@ final class PictureReplacer {
         $base_url_t    = trailingslashit($base_url);
 
         $webp_path = $dir . $filename . '.webp';
-        if ($this->settings->get('format_webp', true) && is_file($webp_path)) {
+        if ($this->settings->get('format_webp', true) && is_file($webp_path) && filesize($webp_path) > 100) {
             $result['webp'] = $base_url_t . $rel_from_base . $filename . '.webp';
         }
 
         $avif_path = $dir . $filename . '.avif';
-        if ($this->settings->get('format_avif', true) && is_file($avif_path)) {
+        if ($this->settings->get('format_avif', true) && is_file($avif_path) && filesize($avif_path) > 100) {
             $result['avif'] = $base_url_t . $rel_from_base . $filename . '.avif';
         }
 

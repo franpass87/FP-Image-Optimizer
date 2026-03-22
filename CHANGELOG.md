@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.0] - 2025-03-22
+
+### Added
+
+- **Duplicato al salvataggio**: quando salvi un articolo o una pagina, crea una copia di ogni immagine usata nel contenuto con nome contestuale (sito-slug-id)
+- Seconda rinominazione: all'upload (rename) + al salvataggio (duplicato)
+- Toggle "Duplicato al salvataggio" nelle impostazioni
+- I duplicati vengono convertiti in WebP/AVIF se l'ottimizzazione è attiva
+
 ## [1.1.2] - 2025-03-22
 
 ### Fixed

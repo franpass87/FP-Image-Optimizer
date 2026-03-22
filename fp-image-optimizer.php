@@ -3,7 +3,7 @@
  * Plugin Name:       FP Image Optimizer
  * Plugin URI:        https://github.com/franpass87/FP-Image-Optimizer
  * Description:       Converte le immagini della Media Library in WebP e AVIF per ridurre peso e migliorare le performance.
- * Version:           1.1.2
+ * Version:           1.2.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Francesco Passeri
@@ -19,7 +19,7 @@ declare(strict_types=1);
 
 defined('ABSPATH') || exit;
 
-define('FP_IMGOPT_VERSION', '1.1.2');
+define('FP_IMGOPT_VERSION', '1.2.0');
 define('FP_IMGOPT_FILE', __FILE__);
 define('FP_IMGOPT_DIR', plugin_dir_path(__FILE__));
 define('FP_IMGOPT_URL', plugin_dir_url(__FILE__));

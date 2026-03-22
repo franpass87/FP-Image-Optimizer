@@ -8,6 +8,7 @@ use FP\ImgOpt\Admin\Settings;
 use FP\ImgOpt\Admin\SettingsPage;
 use FP\ImgOpt\Frontend\PictureReplacer;
 use FP\ImgOpt\Services\ImageConverter;
+use FP\ImgOpt\Services\ImageDuplicatorOnSave;
 use FP\ImgOpt\Services\ImageRenamer;
 
 /**
@@ -72,6 +73,11 @@ final class Plugin {
             $replacer = new PictureReplacer($this->settings);
             add_filter('the_content', [$replacer, 'replace_images'], 20);
             add_filter('post_thumbnail_html', [$replacer, 'replace_thumbnail'], 10, 5);
+        }
+
+        if ($this->settings->get('duplicate_on_save', false)) {
+            $duplicator = new ImageDuplicatorOnSave($this->settings);
+            add_action('save_post', [$duplicator, 'on_save_post'], 20, 1);
         }
     }
 

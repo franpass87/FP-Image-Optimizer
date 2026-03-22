@@ -109,11 +109,22 @@ final class SettingsPage {
 
                 <div class="fpimgopt-toggle-row">
                     <div class="fpimgopt-toggle-info">
-                        <strong><?php echo esc_html__('Rinomina file immagine', 'fp-imgopt'); ?></strong>
-                        <span><?php echo esc_html__('Solo nuovi upload: formato nome-sito-slug-pagina-id (es. mio-sito-contatti-456.jpg). Le immagini esistenti non vengono mai rinominate.', 'fp-imgopt'); ?></span>
+                        <strong><?php echo esc_html__('Rinomina all\'upload', 'fp-imgopt'); ?></strong>
+                        <span><?php echo esc_html__('Solo nuovi upload: formato nome-sito-slug-id (es. mio-sito-media-456.jpg).', 'fp-imgopt'); ?></span>
                     </div>
                     <label class="fpimgopt-toggle">
                         <input type="checkbox" name="fp_imgopt_settings[rename_files]" value="1" <?php checked(!empty($data['rename_files'])); ?>>
+                        <span class="fpimgopt-toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div class="fpimgopt-toggle-row">
+                    <div class="fpimgopt-toggle-info">
+                        <strong><?php echo esc_html__('Duplicato al salvataggio', 'fp-imgopt'); ?></strong>
+                        <span><?php echo esc_html__('Quando salvi un articolo o una pagina, crea una copia di ogni immagine con nome contestuale (es. mio-sito-contatti-456.jpg) e aggiorna il contenuto.', 'fp-imgopt'); ?></span>
+                    </div>
+                    <label class="fpimgopt-toggle">
+                        <input type="checkbox" name="fp_imgopt_settings[duplicate_on_save]" value="1" <?php checked(!empty($data['duplicate_on_save'])); ?>>
                         <span class="fpimgopt-toggle-slider"></span>
                     </label>
                 </div>

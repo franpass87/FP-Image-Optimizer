@@ -19,7 +19,8 @@ final class Settings {
         'quality_avif'    => 75,
         'replace_content' => true,
         'on_upload'       => true,
-        'rename_files'    => false,
+        'rename_files'      => false,
+        'duplicate_on_save' => false,
     ];
 
     private array $data;
@@ -51,7 +52,8 @@ final class Settings {
             'quality_avif'    => min(100, max(1, absint($data['quality_avif'] ?? 75))),
             'replace_content' => !empty($data['replace_content']),
             'on_upload'       => !empty($data['on_upload']),
-            'rename_files'    => !empty($data['rename_files']),
+            'rename_files'      => !empty($data['rename_files']),
+            'duplicate_on_save' => !empty($data['duplicate_on_save']),
         ];
         update_option(self::OPTION_KEY, $sanitized);
         $this->data = wp_parse_args($sanitized, self::DEFAULTS);

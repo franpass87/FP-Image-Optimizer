@@ -1,0 +1,33 @@
+=== FP Image Optimizer ===
+
+Contributors: franpass87
+Tags: images, webp, avif, optimization, performance
+Requires at least: 6.0
+Tested up to: 6.4
+Requires PHP: 8.0
+Stable tag: 1.0.0
+License: Proprietary
+
+Converte le immagini della Media Library in WebP e AVIF per ridurre il peso e migliorare le performance.
+
+== Description ==
+
+FP Image Optimizer genera automaticamente varianti WebP e AVIF delle immagini caricate nella Media Library. I browser compatibili ricevono i formati moderni tramite il tag picture, con fallback al formato originale.
+
+= Funzionalità =
+
+* Conversione automatica al caricamento
+* Sostituzione nel contenuto con tag picture
+* Conversione manuale per immagini esistenti (Media Library)
+* Configurabile: formati, qualità, sostituzione frontend
+
+= Requisiti =
+
+* PHP 8.0+
+* GD con WebP o Imagick
+* AVIF: GD con libavif (PHP 8.1+) o Imagick
+
+== Changelog ==
+
+= 1.0.0 =
+* Release iniziale

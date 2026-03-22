@@ -1,0 +1,12 @@
+{
+    "name": "franpass87/fp-image-optimizer",
+    "description": "WebP and AVIF image optimization for WordPress",
+    "autoload": {
+        "psr-4": {
+            "FP\\ImgOpt\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.0"
+    }
+}

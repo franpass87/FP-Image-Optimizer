@@ -173,7 +173,9 @@
                     const el = document.getElementById('fpimgopt-bulk-status');
                     if (!el) return;
                     if (!st || st.offset === undefined) {
-                        if (!st && bulkPollingTimer) el.textContent = (i18n.bulkDone || 'Bulk completato.') + ' Ricarica per aggiornare.';
+                        clearTimeout(bulkPollingTimer);
+                        bulkPollingTimer = null;
+                        if (!st) el.textContent = (i18n.bulkDone || 'Bulk completato.') + ' Ricarica per aggiornare.';
                         return;
                     }
                     el.textContent = (i18n.bulkRunning || 'Bulk in corso...') + ' Processate: ' + (st.processed || 0) + ' | Convertite: ' + (st.converted || 0) + ' | Errori: ' + (st.failed || 0);

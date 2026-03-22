@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.6.0] - 2025-03-22
+
+### Added
+
+- **Stato bulk in background**: polling ogni 4s con messaggio "Processate: X | Convertite: Y | Errori: Z", messaggio finale "Bulk completato"
+- **Bulk "solo mancanti"**: checkbox per escludere le immagini già convertite
+- **Limite statistiche**: max 2000 immagini, indicatore `capped` e asterisco nel conteggio
+- **Aiuto esclusioni**: lista post type pubblici sotto i campi esclusione
+- **Riprova conversioni fallite**: pulsante "Riprova" che ritenta le immagini in log e poi svuota
+- **Icone colonna Media**: Dashicon `dashicons-yes-alt` al posto del solo testo
+- **Supporto WooCommerce**: filtro `woocommerce_single_product_image_thumbnail_html` per galleria prodotti
+- **Esclusione thumbnail piccole**: impostazione `skip_min_dimension` (0–500 px) per saltare immagini con lato minore del valore
+
 ## [1.5.0] - 2025-03-22
 
 ### Added

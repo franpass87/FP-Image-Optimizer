@@ -31,12 +31,16 @@
             bulkBtn.disabled = true;
             bulkStatus.textContent = i18n.bulkRunning || 'Ottimizzazione bulk in corso...';
 
+            const onlyMissing = document.getElementById('fpimgopt-bulk-only-missing');
+            const onlyMissingVal = onlyMissing && onlyMissing.checked ? '1' : '';
+
             const step = function () {
                 const body = new URLSearchParams();
                 body.set('action', 'fp_imgopt_bulk_convert');
                 body.set('nonce', nonce);
                 body.set('offset', String(offset));
                 body.set('limit', String(limit));
+                if (onlyMissingVal) body.set('only_missing', onlyMissingVal);
 
                 fetch(ajaxUrl, {
                     method: 'POST',
@@ -137,20 +141,77 @@
             bulkBgBtn.addEventListener('click', function () {
                 if (bulkBgBtn.disabled) return;
                 bulkBgBtn.disabled = true;
+                const onlyMissing = document.getElementById('fpimgopt-bulk-only-missing');
                 const body = new URLSearchParams();
                 body.set('action', 'fp_imgopt_bulk_start_background');
                 body.set('nonce', nonce);
+                if (onlyMissing && onlyMissing.checked) body.set('only_missing', '1');
                 fetch(ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() })
                     .then(function (r) { return r.json(); })
                     .then(function (p) {
                         if (p && p.success) {
                             bulkStatus.textContent = i18n.bulkBackgroundOk || 'Bulk avviato in background.';
+                            bulkStatusPolling();
                         } else {
                             bulkStatus.textContent = (i18n.error || 'Errore') + ': ' + (p && p.data && p.data.message ? p.data.message : '');
                         }
                     })
                     .catch(function () { bulkStatus.textContent = (i18n.error || 'Errore') + ' di rete.'; })
                     .finally(function () { bulkBgBtn.disabled = false; });
+            });
+        }
+
+        var bulkPollingTimer = null;
+        function bulkStatusPolling() {
+            const body = new URLSearchParams();
+            body.set('action', 'fp_imgopt_bulk_state');
+            body.set('nonce', nonce);
+            fetch(ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() })
+                .then(function (r) { return r.json(); })
+                .then(function (p) {
+                    const st = p && p.success ? p.data : null;
+                    const el = document.getElementById('fpimgopt-bulk-status');
+                    if (!el) return;
+                    if (!st || st.offset === undefined) {
+                        if (!st && bulkPollingTimer) el.textContent = (i18n.bulkDone || 'Bulk completato.') + ' Ricarica per aggiornare.';
+                        return;
+                    }
+                    el.textContent = (i18n.bulkRunning || 'Bulk in corso...') + ' Processate: ' + (st.processed || 0) + ' | Convertite: ' + (st.converted || 0) + ' | Errori: ' + (st.failed || 0);
+                    bulkPollingTimer = setTimeout(bulkStatusPolling, 4000);
+                });
+        }
+
+        (function () {
+            const el = document.getElementById('fpimgopt-bulk-status');
+            if (!el) return;
+            const body = new URLSearchParams();
+            body.set('action', 'fp_imgopt_bulk_state');
+            body.set('nonce', nonce);
+            fetch(ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() })
+                .then(function (r) { return r.json(); })
+                .then(function (p) {
+                    const st = p && p.success ? p.data : null;
+                    if (st && st.offset !== undefined) {
+                        el.textContent = (i18n.bulkRunning || 'Bulk in corso...') + ' Processate: ' + (st.processed || 0) + ' | Convertite: ' + (st.converted || 0) + ' | Errori: ' + (st.failed || 0);
+                        bulkPollingTimer = setTimeout(bulkStatusPolling, 4000);
+                    }
+                });
+        })();
+
+        const retryBtn = document.getElementById('fpimgopt-retry-failed');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', function () {
+                if (retryBtn.disabled) return;
+                retryBtn.disabled = true;
+                const body = new URLSearchParams();
+                body.set('action', 'fp_imgopt_retry_failed');
+                body.set('nonce', nonce);
+                fetch(ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() })
+                    .then(function (r) { return r.json(); })
+                    .then(function (p) {
+                        if (p && p.success && typeof location !== 'undefined') location.reload();
+                    })
+                    .finally(function () { retryBtn.disabled = false; });
             });
         }
     });
@@ -189,7 +250,7 @@
                     if (payload && payload.success && payload.data) {
                         const d = payload.data;
                         const el = function (id) { return document.getElementById(id); };
-                        if (el('fpimgopt-stat-total')) el('fpimgopt-stat-total').textContent = String(d.total_images || 0);
+                        if (el('fpimgopt-stat-total')) el('fpimgopt-stat-total').textContent = String(d.total_images || 0) + (d.capped ? ' *' : '');
                         if (el('fpimgopt-stat-converted')) el('fpimgopt-stat-converted').textContent = String(d.with_variants || 0);
                         if (el('fpimgopt-stat-webp')) el('fpimgopt-stat-webp').textContent = String(d.webp_count || 0);
                         if (el('fpimgopt-stat-avif')) el('fpimgopt-stat-avif').textContent = String(d.avif_count || 0);

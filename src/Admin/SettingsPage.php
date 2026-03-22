@@ -76,7 +76,7 @@ final class SettingsPage {
         <div class="fpimgopt-card-body">
             <div class="fpimgopt-stats-grid">
                 <div class="fpimgopt-stat-item">
-                    <span class="fpimgopt-stat-value" id="fpimgopt-stat-total"><?php echo $stats ? (int) $stats['total_images'] : '—'; ?></span>
+                    <span class="fpimgopt-stat-value" id="fpimgopt-stat-total"><?php echo $stats ? (int) $stats['total_images'] : '—'; ?><?php echo ($stats && !empty($stats['capped'])) ? ' <span title="' . esc_attr__('Limite 2000 per performance', 'fp-imgopt') . '">*</span>' : ''; ?></span>
                     <span class="fpimgopt-stat-label"><?php echo esc_html__('Immagini totali', 'fp-imgopt'); ?></span>
                 </div>
                 <div class="fpimgopt-stat-item">
@@ -185,11 +185,23 @@ final class SettingsPage {
                     <label for="fp_imgopt_exclude_duplicate"><?php echo esc_html__('Escludi duplicato al salvataggio per post type', 'fp-imgopt'); ?></label>
                     <input type="text" id="fp_imgopt_exclude_duplicate" name="fp_imgopt_settings[exclude_duplicate_post_types]" value="<?php echo esc_attr((string) $data['exclude_duplicate_post_types']); ?>" class="regular-text" placeholder="es. post, page">
                     <p class="description"><?php echo esc_html__('Post type separati da virgola. Duplicato/SEO non verranno applicati.', 'fp-imgopt'); ?></p>
+                    <?php
+                    $post_types = get_post_types(['public' => true], 'objects');
+                    $pt_names  = array_map(static fn ($p) => $p->name, $post_types);
+                    if (!empty($pt_names)) :
+                        ?>
+                    <p class="description fpimgopt-post-types-help"><?php echo esc_html__('Post type presenti:', 'fp-imgopt'); ?> <code><?php echo esc_html(implode(', ', $pt_names)); ?></code></p>
+                    <?php endif; ?>
                 </div>
                 <div class="fpimgopt-field">
                     <label for="fp_imgopt_exclude_replace"><?php echo esc_html__('Escludi sostituzione picture per post type', 'fp-imgopt'); ?></label>
                     <input type="text" id="fp_imgopt_exclude_replace" name="fp_imgopt_settings[exclude_replace_post_types]" value="<?php echo esc_attr((string) $data['exclude_replace_post_types']); ?>" class="regular-text" placeholder="es. product, portfolio">
                     <p class="description"><?php echo esc_html__('Post type separati da virgola. Le immagini non verranno sostituite con picture.', 'fp-imgopt'); ?></p>
+                </div>
+                <div class="fpimgopt-field">
+                    <label for="fp_imgopt_skip_min_dimension"><?php echo esc_html__('Salta immagini più piccole di (px)', 'fp-imgopt'); ?></label>
+                    <input type="number" id="fp_imgopt_skip_min_dimension" name="fp_imgopt_settings[skip_min_dimension]" value="<?php echo esc_attr((string) $data['skip_min_dimension']); ?>" min="0" max="500" class="small-text">
+                    <p class="description"><?php echo esc_html__('0 = disabilitato. Non converte thumbnail o immagini con lato minore di questo valore.', 'fp-imgopt'); ?></p>
                 </div>
 
                 <div class="fpimgopt-fields-grid" style="margin-top: 20px;">
@@ -248,6 +260,12 @@ final class SettingsPage {
         <div class="fpimgopt-card-body">
             <p class="description"><?php echo esc_html__('Per convertire le immagini già presenti: vai su Media → Libreria, passa con il mouse su un\'immagine e clicca su "Converti in WebP/AVIF". Le immagini originali non vengono mai modificate o eliminate.', 'fp-imgopt'); ?></p>
             <p><?php echo esc_html__('Le nuove immagini caricate verranno convertite automaticamente se "Conversione al caricamento" è attiva.', 'fp-imgopt'); ?></p>
+            <div class="fpimgopt-bulk-options">
+                <label>
+                    <input type="checkbox" id="fpimgopt-bulk-only-missing" value="1">
+                    <?php echo esc_html__('Solo mancanti (salta già convertite)', 'fp-imgopt'); ?>
+                </label>
+            </div>
             <div class="fpimgopt-bulk-box">
                 <div class="fpimgopt-bulk-buttons">
                     <button type="button" id="fpimgopt-bulk-start" class="fpimgopt-btn fpimgopt-btn-primary">
@@ -283,9 +301,15 @@ final class SettingsPage {
                 <h2><?php echo esc_html__('Log conversioni fallite', 'fp-imgopt'); ?></h2>
             </div>
             <?php if (!empty($failed_log)) : ?>
-            <button type="button" id="fpimgopt-clear-log" class="fpimgopt-btn fpimgopt-btn-secondary fpimgopt-btn-sm">
-                <?php echo esc_html__('Svuota log', 'fp-imgopt'); ?>
-            </button>
+            <div class="fpimgopt-log-actions">
+                <button type="button" id="fpimgopt-retry-failed" class="fpimgopt-btn fpimgopt-btn-primary fpimgopt-btn-sm">
+                    <span class="dashicons dashicons-update"></span>
+                    <?php echo esc_html__('Riprova', 'fp-imgopt'); ?>
+                </button>
+                <button type="button" id="fpimgopt-clear-log" class="fpimgopt-btn fpimgopt-btn-secondary fpimgopt-btn-sm">
+                    <?php echo esc_html__('Svuota log', 'fp-imgopt'); ?>
+                </button>
+            </div>
             <?php endif; ?>
         </div>
         <div class="fpimgopt-card-body">

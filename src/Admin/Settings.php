@@ -24,6 +24,7 @@ final class Settings {
         'seo_attributes'             => false,
         'exclude_duplicate_post_types' => '',
         'exclude_replace_post_types'   => '',
+        'skip_min_dimension'           => 0,
     ];
 
     private array $data;
@@ -60,6 +61,7 @@ final class Settings {
             'seo_attributes'             => !empty($data['seo_attributes']),
             'exclude_duplicate_post_types' => sanitize_text_field((string) ($data['exclude_duplicate_post_types'] ?? '')),
             'exclude_replace_post_types'   => sanitize_text_field((string) ($data['exclude_replace_post_types'] ?? '')),
+            'skip_min_dimension'           => min(500, max(0, absint($data['skip_min_dimension'] ?? 0))),
         ];
         update_option(self::OPTION_KEY, $sanitized);
         $this->data = wp_parse_args($sanitized, self::DEFAULTS);

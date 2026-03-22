@@ -169,6 +169,16 @@ final class ImageConverter {
             return $result;
         }
 
+        $min_dim = (int) $this->settings->get('skip_min_dimension', 0);
+        if ($min_dim > 0) {
+            $size = @getimagesize($path);
+            if (is_array($size) && isset($size[0], $size[1])) {
+                if ($size[0] < $min_dim || $size[1] < $min_dim) {
+                    return $result;
+                }
+            }
+        }
+
         $do_webp = $this->settings->get('format_webp', true) && $this->supports_webp();
         $do_avif = $this->settings->get('format_avif', true) && $this->supports_avif();
 

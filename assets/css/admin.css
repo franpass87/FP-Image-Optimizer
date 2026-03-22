@@ -373,6 +373,20 @@ body[class*="fp-imgopt"] #wpbody-content > .wrap.fpimgopt-admin-page {
     color: var(--fpdms-success-text, #065f46);
 }
 
+.fpimgopt-bulk-options {
+    margin-bottom: 12px;
+}
+
+.fpimgopt-bulk-options label {
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.fpimgopt-log-actions {
+    display: flex;
+    gap: 8px;
+}
+
 .fpimgopt-bulk-buttons {
     display: flex;
     gap: 10px;

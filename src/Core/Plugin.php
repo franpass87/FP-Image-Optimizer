@@ -65,6 +65,8 @@ final class Plugin {
         add_action('wp_ajax_fp_imgopt_remove_variants', [$this, 'ajax_remove_variants']);
         add_action('wp_ajax_fp_imgopt_clear_log', [$this, 'ajax_clear_log']);
         add_action('wp_ajax_fp_imgopt_bulk_start_background', [$this, 'ajax_bulk_start_background']);
+        add_action('wp_ajax_fp_imgopt_bulk_state', [$this, 'ajax_bulk_state']);
+        add_action('wp_ajax_fp_imgopt_retry_failed', [$this, 'ajax_retry_failed']);
         add_filter('media_row_actions', [$this, 'add_media_row_action'], 10, 2);
         add_filter('manage_media_columns', [$this, 'add_media_column']);
         add_action('manage_media_custom_column', [$this, 'render_media_column'], 10, 2);
@@ -88,6 +90,9 @@ final class Plugin {
             $replacer = new PictureReplacer($this->settings);
             add_filter('the_content', [$replacer, 'replace_images'], 20);
             add_filter('post_thumbnail_html', [$replacer, 'replace_thumbnail'], 10, 5);
+            if (class_exists('WooCommerce')) {
+                add_filter('woocommerce_single_product_image_thumbnail_html', [$replacer, 'replace_woocommerce_image'], 10, 2);
+            }
         }
 
         if ($this->settings->get('duplicate_on_save', false) || $this->settings->get('seo_attributes', false)) {
@@ -258,20 +263,27 @@ final class Plugin {
             wp_send_json_error(['message' => __('Permessi insufficienti.', 'fp-imgopt')], 403);
         }
 
-        $offset = max(0, absint($_REQUEST['offset'] ?? 0));
-        $limit  = min(50, max(1, absint($_REQUEST['limit'] ?? 20)));
+        $offset       = max(0, absint($_REQUEST['offset'] ?? 0));
+        $limit        = min(50, max(1, absint($_REQUEST['limit'] ?? 20)));
+        $only_missing = !empty($_REQUEST['only_missing']);
 
-        $ids = get_posts([
+        $fetch_limit = $only_missing ? 100 : $limit;
+        $ids         = get_posts([
             'post_type'      => 'attachment',
             'post_status'    => 'inherit',
             'post_mime_type' => ['image/jpeg', 'image/png', 'image/gif'],
-            'posts_per_page' => $limit,
+            'posts_per_page' => $fetch_limit,
             'offset'         => $offset,
             'orderby'        => 'ID',
             'order'          => 'ASC',
             'fields'         => 'ids',
             'no_found_rows'  => true,
         ]);
+
+        if ($only_missing && !empty($ids)) {
+            $ids = array_values(array_filter($ids, fn (int $id) => !$this->attachment_has_variants($id)));
+            $ids = array_slice($ids, 0, $limit);
+        }
 
         if (empty($ids)) {
             wp_send_json_success([
@@ -302,13 +314,38 @@ final class Plugin {
 
         $this->invalidate_stats_cache();
 
+        $consumed = $only_missing ? $fetch_limit : count($ids);
         wp_send_json_success([
             'processed' => count($ids),
             'converted' => $converted,
             'failed'    => $failed,
-            'has_more'  => count($ids) === $limit,
-            'next'      => $offset + count($ids),
+            'has_more'  => $consumed === $fetch_limit,
+            'next'      => $offset + $consumed,
         ]);
+    }
+
+    /**
+     * Verifica se un attachment ha già varianti WebP o AVIF.
+     */
+    public function attachment_has_variants(int $attachment_id): bool {
+        $path = get_attached_file($attachment_id);
+        if (!$path || !is_file($path)) {
+            return false;
+        }
+        $path_info = pathinfo($path);
+        $dir       = $path_info['dirname'] . '/';
+        $filename  = $path_info['filename'];
+        $ext       = strtolower($path_info['extension'] ?? '');
+        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif'], true)) {
+            return false;
+        }
+        $has_webp = $this->settings->get('format_webp', true)
+            && is_file($dir . $filename . '.webp')
+            && filesize($dir . $filename . '.webp') > 100;
+        $has_avif = $this->settings->get('format_avif', true)
+            && is_file($dir . $filename . '.avif')
+            && filesize($dir . $filename . '.avif') > 100;
+        return $has_webp || $has_avif;
     }
 
     /**
@@ -334,11 +371,12 @@ final class Plugin {
      * @return array{total_images: int, with_variants: int, webp_count: int, avif_count: int, saved_mb: float}
      */
     public function compute_stats(): array {
-        $ids = get_posts([
+        $max_scan = 2000;
+        $ids      = get_posts([
             'post_type'      => 'attachment',
             'post_status'    => 'inherit',
             'post_mime_type' => ['image/jpeg', 'image/png', 'image/gif'],
-            'posts_per_page' => -1,
+            'posts_per_page' => $max_scan,
             'fields'         => 'ids',
             'no_found_rows'  => true,
         ]);
@@ -434,12 +472,14 @@ final class Plugin {
             }
         }
 
+        $total = count($ids);
         return [
-            'total_images'  => count($ids),
+            'total_images'  => $total,
             'with_variants' => $with_variants,
             'webp_count'    => $webp_count,
             'avif_count'    => $avif_count,
             'saved_mb'      => round($saved_bytes / (1024 * 1024), 2),
+            'capped'        => $total >= $max_scan,
         ];
     }
 
@@ -506,10 +546,64 @@ final class Plugin {
             wp_send_json_error(['message' => __('Permessi insufficienti.', 'fp-imgopt')], 403);
         }
 
-        update_option('fp_imgopt_bulk_state', ['offset' => 0, 'processed' => 0, 'converted' => 0, 'failed' => 0]);
+        $only_missing = !empty($_REQUEST['only_missing']);
+        update_option('fp_imgopt_bulk_state', [
+            'offset'       => 0,
+            'processed'    => 0,
+            'converted'    => 0,
+            'failed'       => 0,
+            'only_missing' => $only_missing,
+        ]);
         wp_schedule_single_event(time() + 10, 'fp_imgopt_bulk_cron');
 
-        wp_send_json_success(['message' => __('Bulk avviato in background.', 'fp-imgopt')]);
+        wp_send_json_success(['message' => __('Bulk avviato in background.', 'fp-imgopt'), 'state' => get_option('fp_imgopt_bulk_state')]);
+    }
+
+    /**
+     * AJAX: restituisce lo stato del bulk in background.
+     */
+    public function ajax_bulk_state(): void {
+        if (!wp_verify_nonce($_REQUEST['nonce'] ?? '', 'fp_imgopt_admin')) {
+            wp_send_json_error(['message' => __('Errore di sicurezza.', 'fp-imgopt')], 403);
+        }
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Permessi insufficienti.', 'fp-imgopt')], 403);
+        }
+
+        $state = get_option('fp_imgopt_bulk_state');
+        wp_send_json_success(is_array($state) ? $state : null);
+    }
+
+    /**
+     * AJAX: ritenta le conversioni degli ultimi errori nel log.
+     */
+    public function ajax_retry_failed(): void {
+        if (!wp_verify_nonce($_REQUEST['nonce'] ?? '', 'fp_imgopt_admin')) {
+            wp_send_json_error(['message' => __('Errore di sicurezza.', 'fp-imgopt')], 403);
+        }
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Permessi insufficienti.', 'fp-imgopt')], 403);
+        }
+
+        $log    = FailedLog::get();
+        $ids    = array_unique(array_map(fn (array $e) => (int) $e['attachment_id'], $log));
+        $retried = 0;
+        $converter = new ImageConverter($this->settings);
+
+        foreach ($ids as $attachment_id) {
+            if ($attachment_id <= 0) {
+                continue;
+            }
+            $result = $converter->convert_attachment($attachment_id);
+            if (!is_wp_error($result) && (!empty($result['webp']) || !empty($result['avif']))) {
+                $retried++;
+                do_action('fp_imgopt_attachment_converted', $attachment_id, $result);
+            }
+        }
+
+        FailedLog::clear();
+        $this->invalidate_stats_cache();
+        wp_send_json_success(['retried' => $retried, 'count' => count($ids)]);
     }
 
     /**
@@ -547,7 +641,10 @@ final class Plugin {
         $has_avif = is_file($dir . $filename . '.avif') && filesize($dir . $filename . '.avif') > 100;
         if ($has_webp || $has_avif) {
             $labels = array_filter([$has_webp ? 'WebP' : '', $has_avif ? 'AVIF' : '']);
-            echo '<span class="fpimgopt-media-badge" title="' . esc_attr(implode(', ', $labels)) . '">&#10003; ' . esc_html(implode(', ', $labels)) . '</span>';
+            echo '<span class="fpimgopt-media-badge" title="' . esc_attr(implode(', ', $labels)) . '">';
+            echo '<span class="dashicons dashicons-yes-alt" style="color:var(--fpdms-success,#00a32a);font-size:16px;width:16px;height:16px;"></span> ';
+            echo esc_html(implode(', ', $labels));
+            echo '</span>';
         } else {
             echo '—';
         }
@@ -589,6 +686,9 @@ final class Plugin {
      * @param \WP_Post|null $post
      */
     public function save_skip_meta(int $post_id, $post): void {
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+            return;
+        }
         if (!isset($_POST['fp_imgopt_skip_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['fp_imgopt_skip_nonce'])), 'fp_imgopt_skip_meta')) {
             return;
         }
@@ -613,21 +713,28 @@ final class Plugin {
             return;
         }
 
-        $offset    = (int) ($state['offset'] ?? 0);
-        $limit     = 20;
-        $converter = new ImageConverter($this->settings);
+        $offset       = (int) ($state['offset'] ?? 0);
+        $limit        = 20;
+        $only_missing = !empty($state['only_missing']);
+        $fetch_limit  = $only_missing ? 100 : $limit;
+        $converter    = new ImageConverter($this->settings);
 
         $ids = get_posts([
             'post_type'      => 'attachment',
             'post_status'    => 'inherit',
             'post_mime_type' => ['image/jpeg', 'image/png', 'image/gif'],
-            'posts_per_page' => $limit,
+            'posts_per_page' => $fetch_limit,
             'offset'         => $offset,
             'orderby'        => 'ID',
             'order'          => 'ASC',
             'fields'         => 'ids',
             'no_found_rows'  => true,
         ]);
+
+        if ($only_missing && !empty($ids)) {
+            $ids = array_values(array_filter($ids, fn (int $id) => !$this->attachment_has_variants($id)));
+            $ids = array_slice($ids, 0, $limit);
+        }
 
         $processed = (int) ($state['processed'] ?? 0);
         $converted = (int) ($state['converted'] ?? 0);
@@ -645,16 +752,16 @@ final class Plugin {
             $processed++;
         }
 
-        $has_more = count($ids) === $limit;
-        $new_offset = $offset + count($ids);
+        $consumed  = $only_missing ? $fetch_limit : count($ids);
+        $has_more  = $consumed === $fetch_limit;
+        $new_offset = $offset + $consumed;
 
         if ($has_more) {
-            update_option('fp_imgopt_bulk_state', [
-                'offset'    => $new_offset,
-                'processed' => $processed,
-                'converted' => $converted,
-                'failed'    => $failed,
-            ]);
+            $state['offset']    = $new_offset;
+            $state['processed'] = $processed;
+            $state['converted'] = $converted;
+            $state['failed']    = $failed;
+            update_option('fp_imgopt_bulk_state', $state);
             wp_schedule_single_event(time() + 60, 'fp_imgopt_bulk_cron');
         } else {
             delete_option('fp_imgopt_bulk_state');

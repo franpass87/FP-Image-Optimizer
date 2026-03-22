@@ -70,6 +70,27 @@ final class PictureReplacer {
     }
 
     /**
+     * Filtro WooCommerce: sostituisce le immagini galleria prodotto.
+     *
+     * @param string $html HTML dell'immagine
+     * @param int $attachment_id ID allegato
+     */
+    public function replace_woocommerce_image(string $html, int $attachment_id): string {
+        if (strpos($html, '<img') === false) {
+            return $html;
+        }
+        $post_id = get_the_ID();
+        if ($post_id && $this->should_skip_replace_for_post($post_id)) {
+            return $html;
+        }
+        return preg_replace_callback(
+            '/<img([^>]+)src=["\']([^"\']+)["\']([^>]*)>/i',
+            [$this, 'replace_single_image'],
+            $html
+        );
+    }
+
+    /**
      * @param array<int, string> $matches
      */
     private function replace_single_image(array $matches): string {

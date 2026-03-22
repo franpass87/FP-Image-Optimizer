@@ -181,6 +181,17 @@ final class SettingsPage {
                     </label>
                 </div>
 
+                <div class="fpimgopt-field" style="margin-top: 16px;">
+                    <label for="fp_imgopt_exclude_duplicate"><?php echo esc_html__('Escludi duplicato al salvataggio per post type', 'fp-imgopt'); ?></label>
+                    <input type="text" id="fp_imgopt_exclude_duplicate" name="fp_imgopt_settings[exclude_duplicate_post_types]" value="<?php echo esc_attr((string) $data['exclude_duplicate_post_types']); ?>" class="regular-text" placeholder="es. post, page">
+                    <p class="description"><?php echo esc_html__('Post type separati da virgola. Duplicato/SEO non verranno applicati.', 'fp-imgopt'); ?></p>
+                </div>
+                <div class="fpimgopt-field">
+                    <label for="fp_imgopt_exclude_replace"><?php echo esc_html__('Escludi sostituzione picture per post type', 'fp-imgopt'); ?></label>
+                    <input type="text" id="fp_imgopt_exclude_replace" name="fp_imgopt_settings[exclude_replace_post_types]" value="<?php echo esc_attr((string) $data['exclude_replace_post_types']); ?>" class="regular-text" placeholder="es. product, portfolio">
+                    <p class="description"><?php echo esc_html__('Post type separati da virgola. Le immagini non verranno sostituite con picture.', 'fp-imgopt'); ?></p>
+                </div>
+
                 <div class="fpimgopt-fields-grid" style="margin-top: 20px;">
                     <div class="fpimgopt-toggle-row">
                         <div class="fpimgopt-toggle-info">
@@ -238,14 +249,59 @@ final class SettingsPage {
             <p class="description"><?php echo esc_html__('Per convertire le immagini già presenti: vai su Media → Libreria, passa con il mouse su un\'immagine e clicca su "Converti in WebP/AVIF". Le immagini originali non vengono mai modificate o eliminate.', 'fp-imgopt'); ?></p>
             <p><?php echo esc_html__('Le nuove immagini caricate verranno convertite automaticamente se "Conversione al caricamento" è attiva.', 'fp-imgopt'); ?></p>
             <div class="fpimgopt-bulk-box">
-                <button type="button" id="fpimgopt-bulk-start" class="fpimgopt-btn fpimgopt-btn-primary">
-                    <span class="dashicons dashicons-update"></span>
-                    <?php echo esc_html__('Avvia Bulk Optimizer sicuro', 'fp-imgopt'); ?>
-                </button>
+                <div class="fpimgopt-bulk-buttons">
+                    <button type="button" id="fpimgopt-bulk-start" class="fpimgopt-btn fpimgopt-btn-primary">
+                        <span class="dashicons dashicons-update"></span>
+                        <?php echo esc_html__('Avvia Bulk Optimizer sicuro', 'fp-imgopt'); ?>
+                    </button>
+                    <button type="button" id="fpimgopt-bulk-background" class="fpimgopt-btn fpimgopt-btn-secondary">
+                        <span class="dashicons dashicons-backup"></span>
+                        <?php echo esc_html__('Avvia in background', 'fp-imgopt'); ?>
+                    </button>
+                </div>
                 <p id="fpimgopt-bulk-status" class="fpimgopt-bulk-status">
                     <?php echo esc_html__('Converte in batch le immagini già presenti senza modificare gli originali.', 'fp-imgopt'); ?>
                 </p>
             </div>
+            <div class="fpimgopt-bulk-box" style="margin-top: 12px;">
+                <button type="button" id="fpimgopt-remove-variants" class="fpimgopt-btn fpimgopt-btn-secondary" style="border-color: var(--fpdms-warning); color: var(--fpdms-warning-text);">
+                    <span class="dashicons dashicons-trash"></span>
+                    <?php echo esc_html__('Rimuovi tutte le varianti WebP/AVIF', 'fp-imgopt'); ?>
+                </button>
+                <p class="description"><?php echo esc_html__('Elimina i file .webp e .avif generati. Le immagini originali restano intatte. Usare per rollback o test.', 'fp-imgopt'); ?></p>
+            </div>
+        </div>
+    </div>
+
+    <?php
+    $failed_log = \FP\ImgOpt\Services\FailedLog::get();
+    ?>
+    <div class="fpimgopt-card">
+        <div class="fpimgopt-card-header">
+            <div class="fpimgopt-card-header-left">
+                <span class="dashicons dashicons-warning"></span>
+                <h2><?php echo esc_html__('Log conversioni fallite', 'fp-imgopt'); ?></h2>
+            </div>
+            <?php if (!empty($failed_log)) : ?>
+            <button type="button" id="fpimgopt-clear-log" class="fpimgopt-btn fpimgopt-btn-secondary fpimgopt-btn-sm">
+                <?php echo esc_html__('Svuota log', 'fp-imgopt'); ?>
+            </button>
+            <?php endif; ?>
+        </div>
+        <div class="fpimgopt-card-body">
+            <?php if (empty($failed_log)) : ?>
+                <p class="description"><?php echo esc_html__('Nessun errore registrato.', 'fp-imgopt'); ?></p>
+            <?php else : ?>
+                <div class="fpimgopt-log-list">
+                    <?php foreach (array_slice($failed_log, 0, 20) as $entry) : ?>
+                        <div class="fpimgopt-log-entry">
+                            <strong>#<?php echo (int) $entry['attachment_id']; ?></strong>
+                            <?php echo esc_html((string) $entry['message']); ?>
+                            <span class="fpimgopt-log-time"><?php echo esc_html(date_i18n(get_option('date_format') . ' ' . get_option('time_format'), (int) $entry['timestamp'])); ?></span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 

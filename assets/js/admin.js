@@ -92,6 +92,70 @@
     });
 
     document.addEventListener('DOMContentLoaded', function () {
+        const cfg = typeof fpImgOptConfig !== 'undefined' ? fpImgOptConfig : {};
+        const ajaxUrl = cfg.ajaxUrl || '';
+        const nonce = cfg.nonce || '';
+        const i18n = cfg.i18n || {};
+
+        const removeBtn = document.getElementById('fpimgopt-remove-variants');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', function () {
+                if (!confirm(i18n.removeConfirm || 'Eliminare tutte le varianti?')) return;
+                removeBtn.disabled = true;
+                const body = new URLSearchParams();
+                body.set('action', 'fp_imgopt_remove_variants');
+                body.set('nonce', nonce);
+                fetch(ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() })
+                    .then(function (r) { return r.json(); })
+                    .then(function (p) {
+                        if (p && p.success) {
+                            alert((i18n.removeSuccess || 'Varianti rimosse.') + ' ' + (p.data && p.data.deleted ? p.data.deleted + ' file eliminati.' : ''));
+                            if (typeof location !== 'undefined') location.reload();
+                        }
+                    })
+                    .finally(function () { removeBtn.disabled = false; });
+            });
+        }
+
+        const clearLogBtn = document.getElementById('fpimgopt-clear-log');
+        if (clearLogBtn) {
+            clearLogBtn.addEventListener('click', function () {
+                clearLogBtn.disabled = true;
+                const body = new URLSearchParams();
+                body.set('action', 'fp_imgopt_clear_log');
+                body.set('nonce', nonce);
+                fetch(ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() })
+                    .then(function (r) { return r.json(); })
+                    .then(function () { if (typeof location !== 'undefined') location.reload(); })
+                    .finally(function () { clearLogBtn.disabled = false; });
+            });
+        }
+
+        const bulkBgBtn = document.getElementById('fpimgopt-bulk-background');
+        const bulkStatus = document.getElementById('fpimgopt-bulk-status');
+        if (bulkBgBtn && bulkStatus) {
+            bulkBgBtn.addEventListener('click', function () {
+                if (bulkBgBtn.disabled) return;
+                bulkBgBtn.disabled = true;
+                const body = new URLSearchParams();
+                body.set('action', 'fp_imgopt_bulk_start_background');
+                body.set('nonce', nonce);
+                fetch(ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() })
+                    .then(function (r) { return r.json(); })
+                    .then(function (p) {
+                        if (p && p.success) {
+                            bulkStatus.textContent = i18n.bulkBackgroundOk || 'Bulk avviato in background.';
+                        } else {
+                            bulkStatus.textContent = (i18n.error || 'Errore') + ': ' + (p && p.data && p.data.message ? p.data.message : '');
+                        }
+                    })
+                    .catch(function () { bulkStatus.textContent = (i18n.error || 'Errore') + ' di rete.'; })
+                    .finally(function () { bulkBgBtn.disabled = false; });
+            });
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
         const refreshBtn = document.getElementById('fpimgopt-stats-refresh');
         if (!refreshBtn) {
             return;

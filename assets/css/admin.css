@@ -368,6 +368,34 @@ body[class*="fp-imgopt"] #wpbody-content > .wrap.fpimgopt-admin-page {
     letter-spacing: 0.5px;
 }
 
+.fpimgopt-media-badge {
+    font-size: 11px;
+    color: var(--fpdms-success-text, #065f46);
+}
+
+.fpimgopt-bulk-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.fpimgopt-log-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.fpimgopt-log-entry {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--fpdms-border-light);
+    font-size: 12px;
+}
+
+.fpimgopt-log-time {
+    color: var(--fpdms-text-muted);
+    font-size: 11px;
+    margin-left: 8px;
+}
+
 .fpimgopt-bulk-box {
     margin-top: 16px;
     border: 1px solid var(--fpdms-border-light);

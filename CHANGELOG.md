@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.5.0] - 2025-03-22
+
+### Added
+
+- **Rimozione varianti**: pulsante "Rimuovi tutte le varianti WebP/AVIF" per rollback/test (gli originali restano intatti)
+- **Esclusioni**: campi per escludere post type da duplicato-al-salvataggio e da sostituzione picture; meta box "Non ottimizzare immagini" su post/pagina
+- **Bulk in background**: pulsante "Avvia in background" che esegue il bulk via cron (batch ogni minuto)
+- **Log conversioni fallite**: sezione con ultimi 50 errori e pulsante "Svuota log"
+- **Colonna Media Library**: indicatore WebP/AVIF sulla tabella Media
+
 ## [1.4.0] - 2025-03-22
 
 ### Added

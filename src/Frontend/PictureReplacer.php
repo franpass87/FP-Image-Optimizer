@@ -28,6 +28,11 @@ final class PictureReplacer {
             return $content;
         }
 
+        $post_id = get_the_ID();
+        if ($post_id && $this->should_skip_replace_for_post((int) $post_id)) {
+            return $content;
+        }
+
         return preg_replace_callback(
             '/<img([^>]+)src=["\']([^"\']+)["\']([^>]*)>/i',
             [$this, 'replace_single_image'],
@@ -52,6 +57,9 @@ final class PictureReplacer {
         array $attr
     ): string {
         if (strpos($html, '<img') === false) {
+            return $html;
+        }
+        if ($this->should_skip_replace_for_post($post_id)) {
             return $html;
         }
         return preg_replace_callback(
@@ -114,6 +122,22 @@ final class PictureReplacer {
         );
 
         return (string) apply_filters('fp_imgopt_picture_html', $picture, $src, $variants);
+    }
+
+    /**
+     * Verifica se saltare la sostituzione per un determinato post.
+     */
+    private function should_skip_replace_for_post(int $post_id): bool {
+        if (get_post_meta($post_id, 'fp_imgopt_skip', true)) {
+            return true;
+        }
+        $post = get_post($post_id);
+        if (!$post) {
+            return false;
+        }
+        $excluded = $this->settings->get('exclude_replace_post_types', '');
+        $types    = array_filter(array_map('trim', explode(',', (string) $excluded)));
+        return in_array($post->post_type, $types, true);
     }
 
     /**

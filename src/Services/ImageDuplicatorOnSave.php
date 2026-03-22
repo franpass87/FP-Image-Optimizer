@@ -37,7 +37,16 @@ final class ImageDuplicatorOnSave {
         }
 
         $post = get_post($post_id);
-        if (!$post || !in_array($post->post_type, ['post', 'page'], true)) {
+        if (!$post) {
+            return;
+        }
+
+        $allowed = array_diff(['post', 'page'], $this->get_excluded_duplicate_types());
+        if (!in_array($post->post_type, $allowed, true)) {
+            return;
+        }
+
+        if (get_post_meta($post_id, 'fp_imgopt_skip', true)) {
             return;
         }
 
@@ -228,6 +237,15 @@ final class ImageDuplicatorOnSave {
     private function sanitize_slug(string $slug): string {
         $s = sanitize_title($slug);
         return substr($s, 0, self::MAX_SLUG_LENGTH) ?: 'media';
+    }
+
+    /**
+     * @return string[]
+     */
+    private function get_excluded_duplicate_types(): array {
+        $raw = $this->settings->get('exclude_duplicate_post_types', '');
+        $arr = array_map('trim', explode(',', (string) $raw));
+        return array_filter($arr);
     }
 
     private function is_copyable(string $path): bool {

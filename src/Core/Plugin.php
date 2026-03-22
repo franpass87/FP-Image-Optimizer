@@ -7,9 +7,11 @@ namespace FP\ImgOpt\Core;
 use FP\ImgOpt\Admin\Settings;
 use FP\ImgOpt\Admin\SettingsPage;
 use FP\ImgOpt\Frontend\PictureReplacer;
+use FP\ImgOpt\Services\FailedLog;
 use FP\ImgOpt\Services\ImageConverter;
 use FP\ImgOpt\Services\ImageDuplicatorOnSave;
 use FP\ImgOpt\Services\ImageRenamer;
+use FP\ImgOpt\Services\VariantRemover;
 
 /**
  * Bootstrap del plugin FP Image Optimizer.
@@ -60,7 +62,17 @@ final class Plugin {
         add_action('wp_ajax_fp_imgopt_convert', [$this, 'ajax_convert']);
         add_action('wp_ajax_fp_imgopt_bulk_convert', [$this, 'ajax_bulk_convert']);
         add_action('wp_ajax_fp_imgopt_stats', [$this, 'ajax_stats']);
+        add_action('wp_ajax_fp_imgopt_remove_variants', [$this, 'ajax_remove_variants']);
+        add_action('wp_ajax_fp_imgopt_clear_log', [$this, 'ajax_clear_log']);
+        add_action('wp_ajax_fp_imgopt_bulk_start_background', [$this, 'ajax_bulk_start_background']);
         add_filter('media_row_actions', [$this, 'add_media_row_action'], 10, 2);
+        add_filter('manage_media_columns', [$this, 'add_media_column']);
+        add_action('manage_media_custom_column', [$this, 'render_media_column'], 10, 2);
+        add_action('add_meta_boxes', [$this, 'add_skip_meta_box']);
+        add_action('save_post', [$this, 'save_skip_meta'], 10, 2);
+
+        add_action('fp_imgopt_bulk_cron', [$this, 'run_bulk_cron']);
+        add_action('init', [$this, 'maybe_schedule_bulk_cron']);
 
         if (!$this->settings->get('enabled', false)) {
             return;
@@ -135,8 +147,14 @@ final class Plugin {
     public function enqueue_admin_assets(string $hook): void {
         $is_our_page = str_contains($hook, 'fp-imgopt')
             || (isset($_GET['page']) && sanitize_text_field(wp_unslash($_GET['page'])) === 'fp-imgopt');
+        $is_media   = $hook === 'upload.php';
 
-        if (!$is_our_page) {
+        if (!$is_our_page && !$is_media) {
+            return;
+        }
+
+        if ($is_media) {
+            wp_enqueue_style('fp-imgopt-admin', FP_IMGOPT_URL . 'assets/css/admin.css', [], FP_IMGOPT_VERSION);
             return;
         }
 
@@ -168,8 +186,11 @@ final class Plugin {
                 'bulkRunning'  => __('Ottimizzazione bulk in corso...', 'fp-imgopt'),
                 'bulkDone'     => __('Ottimizzazione bulk completata.', 'fp-imgopt'),
                 'bulkNone'     => __('Nessuna immagine da ottimizzare.', 'fp-imgopt'),
-                'statsRefresh' => __('Aggiorna statistiche', 'fp-imgopt'),
-                'statsLoading' => __('Calcolo in corso...', 'fp-imgopt'),
+                'statsRefresh'     => __('Aggiorna statistiche', 'fp-imgopt'),
+                'statsLoading'     => __('Calcolo in corso...', 'fp-imgopt'),
+                'removeConfirm'    => __('Eliminare tutte le varianti WebP/AVIF? Le immagini originali restano intatte.', 'fp-imgopt'),
+                'removeSuccess'    => __('Varianti rimosse.', 'fp-imgopt'),
+                'bulkBackgroundOk' => __('Bulk avviato in background. Esegue un batch ogni minuto.', 'fp-imgopt'),
             ],
         ]);
     }
@@ -204,6 +225,7 @@ final class Plugin {
         $result    = $converter->convert_attachment($attachment_id);
 
         if (is_wp_error($result)) {
+            FailedLog::add($attachment_id, $result->get_error_message());
             if (wp_doing_ajax()) {
                 wp_send_json_error(['message' => $result->get_error_message()]);
             }
@@ -268,6 +290,7 @@ final class Plugin {
         foreach ($ids as $attachment_id) {
             $result = $converter->convert_attachment((int) $attachment_id);
             if (is_wp_error($result)) {
+                FailedLog::add((int) $attachment_id, $result->get_error_message());
                 $failed++;
                 continue;
             }
@@ -437,6 +460,220 @@ final class Plugin {
     public function invalidate_stats_on_upload(array $metadata, int $attachment_id): array {
         $this->invalidate_stats_cache();
         return $metadata;
+    }
+
+    /**
+     * AJAX: rimuove tutte le varianti WebP/AVIF.
+     */
+    public function ajax_remove_variants(): void {
+        if (!wp_verify_nonce($_REQUEST['nonce'] ?? '', 'fp_imgopt_admin')) {
+            wp_send_json_error(['message' => __('Errore di sicurezza.', 'fp-imgopt')], 403);
+        }
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Permessi insufficienti.', 'fp-imgopt')], 403);
+        }
+
+        $remover = new VariantRemover();
+        $result  = $remover->remove_all_variants();
+        $this->invalidate_stats_cache();
+
+        wp_send_json_success($result);
+    }
+
+    /**
+     * AJAX: svuota il log errori.
+     */
+    public function ajax_clear_log(): void {
+        if (!wp_verify_nonce($_REQUEST['nonce'] ?? '', 'fp_imgopt_admin')) {
+            wp_send_json_error(['message' => __('Errore di sicurezza.', 'fp-imgopt')], 403);
+        }
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Permessi insufficienti.', 'fp-imgopt')], 403);
+        }
+
+        FailedLog::clear();
+        wp_send_json_success([]);
+    }
+
+    /**
+     * AJAX: avvia il bulk optimizer in background (cron).
+     */
+    public function ajax_bulk_start_background(): void {
+        if (!wp_verify_nonce($_REQUEST['nonce'] ?? '', 'fp_imgopt_admin')) {
+            wp_send_json_error(['message' => __('Errore di sicurezza.', 'fp-imgopt')], 403);
+        }
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Permessi insufficienti.', 'fp-imgopt')], 403);
+        }
+
+        update_option('fp_imgopt_bulk_state', ['offset' => 0, 'processed' => 0, 'converted' => 0, 'failed' => 0]);
+        wp_schedule_single_event(time() + 10, 'fp_imgopt_bulk_cron');
+
+        wp_send_json_success(['message' => __('Bulk avviato in background.', 'fp-imgopt')]);
+    }
+
+    /**
+     * Colonna Media Library: WebP/AVIF.
+     *
+     * @param string[] $columns
+     * @return string[]
+     */
+    public function add_media_column(array $columns): array {
+        $columns['fp_imgopt_variants'] = 'WebP/AVIF';
+        return $columns;
+    }
+
+    /**
+     * Render della colonna WebP/AVIF.
+     */
+    public function render_media_column(string $column_name, int $post_id): void {
+        if ($column_name !== 'fp_imgopt_variants') {
+            return;
+        }
+        $path = get_attached_file($post_id);
+        if (!$path || !is_file($path)) {
+            echo '—';
+            return;
+        }
+        $path_info = pathinfo($path);
+        $ext       = strtolower($path_info['extension'] ?? '');
+        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif'], true)) {
+            echo '—';
+            return;
+        }
+        $dir      = $path_info['dirname'] . '/';
+        $filename = $path_info['filename'];
+        $has_webp = is_file($dir . $filename . '.webp') && filesize($dir . $filename . '.webp') > 100;
+        $has_avif = is_file($dir . $filename . '.avif') && filesize($dir . $filename . '.avif') > 100;
+        if ($has_webp || $has_avif) {
+            $labels = array_filter([$has_webp ? 'WebP' : '', $has_avif ? 'AVIF' : '']);
+            echo '<span class="fpimgopt-media-badge" title="' . esc_attr(implode(', ', $labels)) . '">&#10003; ' . esc_html(implode(', ', $labels)) . '</span>';
+        } else {
+            echo '—';
+        }
+    }
+
+    /**
+     * Meta box "Non ottimizzare" su post/pagina.
+     */
+    public function add_skip_meta_box(): void {
+        add_meta_box(
+            'fp_imgopt_skip',
+            __('FP Image Optimizer', 'fp-imgopt'),
+            [$this, 'render_skip_meta_box'],
+            ['post', 'page'],
+            'side'
+        );
+    }
+
+    /**
+     * Render del meta box skip.
+     */
+    public function render_skip_meta_box(\WP_Post $post): void {
+        wp_nonce_field('fp_imgopt_skip_meta', 'fp_imgopt_skip_nonce');
+        $checked = get_post_meta($post->ID, 'fp_imgopt_skip', true);
+        ?>
+        <p>
+            <label>
+                <input type="checkbox" name="fp_imgopt_skip" value="1" <?php checked($checked); ?>>
+                <?php echo esc_html__('Non ottimizzare immagini per questo contenuto', 'fp-imgopt'); ?>
+            </label>
+        </p>
+        <?php
+    }
+
+    /**
+     * Salva meta fp_imgopt_skip.
+     *
+     * @param int $post_id
+     * @param \WP_Post|null $post
+     */
+    public function save_skip_meta(int $post_id, $post): void {
+        if (!isset($_POST['fp_imgopt_skip_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['fp_imgopt_skip_nonce'])), 'fp_imgopt_skip_meta')) {
+            return;
+        }
+        $post = $post ?? get_post($post_id);
+        if (!$post || !in_array($post->post_type, ['post', 'page'], true)) {
+            return;
+        }
+        if (!current_user_can('edit_post', $post_id)) {
+            return;
+        }
+
+        $val = isset($_POST['fp_imgopt_skip']) && $_POST['fp_imgopt_skip'] === '1' ? '1' : '';
+        update_post_meta($post_id, 'fp_imgopt_skip', $val);
+    }
+
+    /**
+     * Cron: esegue un batch del bulk optimizer.
+     */
+    public function run_bulk_cron(): void {
+        $state = get_option('fp_imgopt_bulk_state');
+        if (!is_array($state)) {
+            return;
+        }
+
+        $offset    = (int) ($state['offset'] ?? 0);
+        $limit     = 20;
+        $converter = new ImageConverter($this->settings);
+
+        $ids = get_posts([
+            'post_type'      => 'attachment',
+            'post_status'    => 'inherit',
+            'post_mime_type' => ['image/jpeg', 'image/png', 'image/gif'],
+            'posts_per_page' => $limit,
+            'offset'         => $offset,
+            'orderby'        => 'ID',
+            'order'          => 'ASC',
+            'fields'         => 'ids',
+            'no_found_rows'  => true,
+        ]);
+
+        $processed = (int) ($state['processed'] ?? 0);
+        $converted = (int) ($state['converted'] ?? 0);
+        $failed    = (int) ($state['failed'] ?? 0);
+
+        foreach ($ids as $attachment_id) {
+            $result = $converter->convert_attachment((int) $attachment_id);
+            if (is_wp_error($result)) {
+                FailedLog::add((int) $attachment_id, $result->get_error_message());
+                $failed++;
+            } elseif (!empty($result['webp']) || !empty($result['avif'])) {
+                $converted++;
+                do_action('fp_imgopt_attachment_converted', $attachment_id, $result);
+            }
+            $processed++;
+        }
+
+        $has_more = count($ids) === $limit;
+        $new_offset = $offset + count($ids);
+
+        if ($has_more) {
+            update_option('fp_imgopt_bulk_state', [
+                'offset'    => $new_offset,
+                'processed' => $processed,
+                'converted' => $converted,
+                'failed'    => $failed,
+            ]);
+            wp_schedule_single_event(time() + 60, 'fp_imgopt_bulk_cron');
+        } else {
+            delete_option('fp_imgopt_bulk_state');
+            $this->invalidate_stats_cache();
+        }
+    }
+
+    /**
+     * Pulizia: se il cron è schedulato ma lo stato è stato cancellato, rimuovi il cron.
+     */
+    public function maybe_schedule_bulk_cron(): void {
+        if (!wp_next_scheduled('fp_imgopt_bulk_cron')) {
+            return;
+        }
+        $state = get_option('fp_imgopt_bulk_state');
+        if (is_array($state) && isset($state['offset'])) {
+            return;
+        }
+        wp_clear_scheduled_hook('fp_imgopt_bulk_cron');
     }
 
     public function get_settings(): Settings {

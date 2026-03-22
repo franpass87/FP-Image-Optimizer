@@ -61,6 +61,9 @@ final class ImageRenamer {
             return $metadata;
         }
 
+        if (str_contains($main_file, '..')) {
+            return $metadata;
+        }
         $main_path = $base_dir . $main_file;
         if (!is_file($main_path) || !$this->is_renamable($main_path)) {
             return $metadata;
@@ -96,6 +99,10 @@ final class ImageRenamer {
             foreach ($metadata['sizes'] as $key => $size_data) {
                 $old_file = $size_data['file'] ?? '';
                 if (empty($old_file)) {
+                    continue;
+                }
+                $old_file = basename($old_file);
+                if ($old_file === '' || str_contains($old_file, '..')) {
                     continue;
                 }
                 $old_full = $full_dir . $old_file;
@@ -223,8 +230,12 @@ final class ImageRenamer {
     ): void {
         global $wpdb;
 
+        $last_slash = strrpos($old_main_url, '/');
+        if ($last_slash === false) {
+            return;
+        }
         $filename_base = pathinfo($old_main_url, PATHINFO_FILENAME);
-        $search_base   = substr($old_main_url, 0, strrpos($old_main_url, '/') + 1) . $filename_base;
+        $search_base   = substr($old_main_url, 0, $last_slash + 1) . $filename_base;
         $pattern      = '%' . $wpdb->esc_like($search_base) . '%';
 
         $posts = $wpdb->get_col($wpdb->prepare(

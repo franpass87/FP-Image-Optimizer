@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.3] - 2025-03-22
+
+### Fixed
+
+- **ImageRenamer**: basename + blocco `..` su file dimensioni; check strrpos su URL
+- **ImageConverter**: validazione path realpath, blocco `..` e duplicati; basename su size file
+- **ImageDuplicatorOnSave**: basename su size file; validazione realpath per path in uploads
+
 ## [1.3.2] - 2025-03-22
 
 ### Fixed

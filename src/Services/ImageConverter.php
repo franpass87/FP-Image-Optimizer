@@ -39,18 +39,37 @@ final class ImageConverter {
         if (!empty($upload_dir['error'])) {
             return $metadata;
         }
-        $base_dir = trailingslashit($upload_dir['basedir']);
-        $rel_dir  = dirname($metadata['file'] ?? '') . '/';
+        $base_dir  = trailingslashit($upload_dir['basedir']);
+        $base_real = realpath($base_dir) ?: $base_dir;
+        $rel_dir   = dirname($metadata['file'] ?? '') . '/';
 
         $files_to_convert = [];
 
-        if (!empty($metadata['file'])) {
-            $files_to_convert[] = $base_dir . $metadata['file'];
+        if (!empty($metadata['file']) && !str_contains($metadata['file'], '..')) {
+            $main_path = $base_dir . $metadata['file'];
+            if (is_file($main_path)) {
+                $main_real = realpath($main_path);
+                if ($main_real && strpos($main_real, $base_real) === 0) {
+                    $files_to_convert[$main_real] = $main_path;
+                }
+            }
         }
         if (!empty($metadata['sizes']) && is_array($metadata['sizes'])) {
             foreach ($metadata['sizes'] as $size_data) {
-                if (!empty($size_data['file'])) {
-                    $files_to_convert[] = $base_dir . $rel_dir . $size_data['file'];
+                $sf = $size_data['file'] ?? '';
+                if ($sf === '' || str_contains($sf, '..')) {
+                    continue;
+                }
+                $sf = basename($sf);
+                if ($sf === '') {
+                    continue;
+                }
+                $size_path = $base_dir . $rel_dir . $sf;
+                if (is_file($size_path)) {
+                    $size_real = realpath($size_path);
+                    if ($size_real && strpos($size_real, $base_real) === 0 && !isset($files_to_convert[$size_real])) {
+                        $files_to_convert[$size_real] = $size_path;
+                    }
                 }
             }
         }
@@ -85,30 +104,53 @@ final class ImageConverter {
             return new WP_Error('fp_imgopt_upload_dir', $upload_dir['error']);
         }
 
-        $base_dir = trailingslashit($upload_dir['basedir']);
-        $rel_dir  = dirname($metadata['file'] ?? '') . '/';
+        $base_dir  = trailingslashit($upload_dir['basedir']);
+        $base_real = realpath($base_dir) ?: $base_dir;
+        $rel_dir   = dirname($metadata['file'] ?? '') . '/';
 
         $result = ['webp' => false, 'avif' => false];
+        $seen   = [];
 
-        $files = [$path];
-        if (!empty($metadata['sizes']) && is_array($metadata['sizes'])) {
-            foreach ($metadata['sizes'] as $s) {
-                if (!empty($s['file'])) {
-                    $files[] = $base_dir . $rel_dir . $s['file'];
+        $path_real = realpath($path);
+        if ($path_real && strpos($path_real, $base_real) === 0) {
+            $seen[$path_real] = true;
+            if (is_file($path) && $this->is_supported_source($path)) {
+                $r = $this->convert_file($path);
+                if ($r['webp'] ?? false) {
+                    $result['webp'] = true;
+                }
+                if ($r['avif'] ?? false) {
+                    $result['avif'] = true;
                 }
             }
         }
 
-        foreach ($files as $file) {
-            if (!is_file($file) || !$this->is_supported_source($file)) {
-                continue;
-            }
-            $r = $this->convert_file($file);
-            if ($r['webp'] ?? false) {
-                $result['webp'] = true;
-            }
-            if ($r['avif'] ?? false) {
-                $result['avif'] = true;
+        if (!empty($metadata['sizes']) && is_array($metadata['sizes'])) {
+            foreach ($metadata['sizes'] as $s) {
+                $sf = $s['file'] ?? '';
+                if ($sf === '' || str_contains($sf, '..')) {
+                    continue;
+                }
+                $sf = basename($sf);
+                if ($sf === '') {
+                    continue;
+                }
+                $file = $base_dir . $rel_dir . $sf;
+                if (!is_file($file) || !$this->is_supported_source($file)) {
+                    continue;
+                }
+                $file_real = realpath($file);
+                if (!$file_real || strpos($file_real, $base_real) !== 0 || isset($seen[$file_real])) {
+                    continue;
+                }
+                $seen[$file_real] = true;
+                $r = $this->convert_file($file);
+                if ($r['webp'] ?? false) {
+                    $result['webp'] = true;
+                }
+                if ($r['avif'] ?? false) {
+                    $result['avif'] = true;
+                }
             }
         }
 

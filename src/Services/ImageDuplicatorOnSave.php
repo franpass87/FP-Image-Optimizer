@@ -74,6 +74,7 @@ final class ImageDuplicatorOnSave {
 
         $base_dir  = trailingslashit($upload_dir['basedir']);
         $base_url  = trailingslashit($upload_dir['baseurl']);
+        $base_real = realpath($base_dir) ?: $base_dir;
         $slug      = $this->sanitize_slug($post->post_name ?? 'media');
         $site      = $this->sanitize_site();
         $converter = new ImageConverter($this->settings);
@@ -90,8 +91,15 @@ final class ImageDuplicatorOnSave {
                 continue;
             }
 
-            $rel_dir  = trim(str_replace($base_dir, '', dirname($paths['main'])), '/');
-            $full_dir = $base_dir . $rel_dir . '/';
+            $rel_dir = trim(str_replace($base_dir, '', dirname($paths['main'])), '/');
+            if (str_contains($rel_dir, '..')) {
+                continue;
+            }
+            $full_dir  = $base_dir . $rel_dir . '/';
+            $full_real = realpath($full_dir) ?: $full_dir;
+            if (!$full_real || strpos($full_real, $base_real) !== 0) {
+                continue;
+            }
             $base_name = $site . '-' . $slug . '-' . $att_id;
 
             foreach ($paths as $size_key => $old_path) {
@@ -186,6 +194,11 @@ final class ImageDuplicatorOnSave {
         if (strpos($path, $base_dir) !== 0) {
             return [];
         }
+        $base_real = realpath($base_dir) ?: $base_dir;
+        $path_real = realpath($path) ?: $path;
+        if (!$path_real || strpos($path_real, $base_real) !== 0) {
+            return [];
+        }
 
         $result = ['main' => $path];
 
@@ -194,6 +207,10 @@ final class ImageDuplicatorOnSave {
             $dir = dirname($path) . '/';
             foreach ($meta['sizes'] as $key => $size) {
                 $f = $size['file'] ?? '';
+                if ($f === '' || str_contains($f, '..')) {
+                    continue;
+                }
+                $f = basename($f);
                 if ($f !== '' && is_file($dir . $f)) {
                     $result[$key] = $dir . $f;
                 }

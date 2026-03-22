@@ -67,3 +67,6 @@ FP-Image-Optimizer/
 - Sito: [francescopasseri.com](https://francescopasseri.com)
 - Email: [info@francescopasseri.com](mailto:info@francescopasseri.com)
 - GitHub: [github.com/franpass87](https://github.com/franpass87)
+=======
+# FP-Image-Optimizer
+>>>>>>> a7200a15a78ceedf6184095274bd03e059fbbe6a

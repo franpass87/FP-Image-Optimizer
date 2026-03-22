@@ -265,4 +265,49 @@
                 });
         });
     });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const renameBtns = document.querySelectorAll('.fpimgopt-rename-post-btn');
+        renameBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const postId = btn.getAttribute('data-post-id');
+                const postTitle = btn.getAttribute('data-post-title') || '';
+                if (!postId || !confirm((fpImgOptConfig.i18n && fpImgOptConfig.i18n.renameConfirm) || 'Rinominare le immagini?')) {
+                    return;
+                }
+                btn.disabled = true;
+                var origHtml = btn.innerHTML;
+                btn.innerHTML = '<span class="dashicons dashicons-update is-loading"></span> ' + (fpImgOptConfig.i18n && fpImgOptConfig.i18n.converting ? fpImgOptConfig.i18n.converting : 'Elaborazione...');
+                var body = new URLSearchParams();
+                body.set('action', 'fp_imgopt_rename_post_images');
+                body.set('nonce', fpImgOptConfig.nonce);
+                body.set('post_id', postId);
+                fetch(fpImgOptConfig.ajaxUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                    body: body.toString()
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (p) {
+                        if (p && p.success && p.data) {
+                            var msg = (fpImgOptConfig.i18n && fpImgOptConfig.i18n.renameSuccess) || 'Rinominate.';
+                            if (p.data.renamed !== undefined) msg += ' ' + p.data.renamed + '/' + (p.data.total || 0);
+                            if (p.data.errors && p.data.errors.length) msg += ' (' + p.data.errors.length + ' errori)';
+                            alert(msg);
+                            if (typeof location !== 'undefined') location.reload();
+                        } else {
+                            var errMsg = ((fpImgOptConfig.i18n && fpImgOptConfig.i18n.renameError) || 'Errore.') + ' ' + (p && p.data && p.data.message ? p.data.message : '');
+                            alert(errMsg);
+                            btn.disabled = false;
+                            btn.innerHTML = origHtml;
+                        }
+                    })
+                    .catch(function () {
+                        alert((fpImgOptConfig.i18n && fpImgOptConfig.i18n.renameError) || 'Errore di rete.');
+                        btn.disabled = false;
+                        btn.innerHTML = origHtml;
+                    });
+            });
+        });
+    });
 })();

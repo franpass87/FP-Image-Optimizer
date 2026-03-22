@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.0] - 2026-03-22
+
+### Added
+
+- **Rinomina per contenuto**: pagina admin con tab Pagine/Articoli per rinominare one-click le immagini nei contenuti secondo il formato nome-sito-slug-id
+- **ContentImageExtractor**: estrae gli ID attachment da `post_content` (img src e srcset)
+- **ImageRenamer::rename_attachment_for_post()**: rinomina un attachment con contesto post, aggiorna varianti WebP/AVIF e riferimenti nel contenuto
+
+### Fixed
+
+- **admin.js**: messaggio di errore AJAX rinomina ora mostrato correttamente nell'alert
+- **RenameByPostPage**: sanitizzazione `$_GET['tab']` con `sanitize_text_field`
+
 ## [1.6.1] - 2025-03-22
 
 ### Fixed

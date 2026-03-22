@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace FP\ImgOpt\Core;
 
+use FP\ImgOpt\Admin\RenameByPostPage;
 use FP\ImgOpt\Admin\Settings;
 use FP\ImgOpt\Admin\SettingsPage;
 use FP\ImgOpt\Frontend\PictureReplacer;
 use FP\ImgOpt\Services\FailedLog;
 use FP\ImgOpt\Services\ImageConverter;
+use FP\ImgOpt\Services\ContentImageExtractor;
 use FP\ImgOpt\Services\ImageDuplicatorOnSave;
 use FP\ImgOpt\Services\ImageRenamer;
 use FP\ImgOpt\Services\VariantRemover;
@@ -67,6 +69,7 @@ final class Plugin {
         add_action('wp_ajax_fp_imgopt_bulk_start_background', [$this, 'ajax_bulk_start_background']);
         add_action('wp_ajax_fp_imgopt_bulk_state', [$this, 'ajax_bulk_state']);
         add_action('wp_ajax_fp_imgopt_retry_failed', [$this, 'ajax_retry_failed']);
+        add_action('wp_ajax_fp_imgopt_rename_post_images', [$this, 'ajax_rename_post_images']);
         add_filter('media_row_actions', [$this, 'add_media_row_action'], 10, 2);
         add_filter('manage_media_columns', [$this, 'add_media_column']);
         add_action('manage_media_custom_column', [$this, 'render_media_column'], 10, 2);
@@ -142,6 +145,14 @@ final class Plugin {
             'dashicons-images-alt2',
             58
         );
+        add_submenu_page(
+            'fp-imgopt',
+            __('Rinomina per pagina/articolo', 'fp-imgopt'),
+            __('Rinomina per contenuto', 'fp-imgopt'),
+            'manage_options',
+            RenameByPostPage::PAGE_SLUG,
+            [new RenameByPostPage($this->settings), 'render']
+        );
     }
 
     /**
@@ -150,8 +161,9 @@ final class Plugin {
      * @param string $hook Pagina admin corrente.
      */
     public function enqueue_admin_assets(string $hook): void {
+        $page = isset($_GET['page']) ? sanitize_text_field(wp_unslash($_GET['page'])) : '';
         $is_our_page = str_contains($hook, 'fp-imgopt')
-            || (isset($_GET['page']) && sanitize_text_field(wp_unslash($_GET['page'])) === 'fp-imgopt');
+            || in_array($page, ['fp-imgopt', RenameByPostPage::PAGE_SLUG], true);
         $is_media   = $hook === 'upload.php';
 
         if (!$is_our_page && !$is_media) {
@@ -196,6 +208,9 @@ final class Plugin {
                 'removeConfirm'    => __('Eliminare tutte le varianti WebP/AVIF? Le immagini originali restano intatte.', 'fp-imgopt'),
                 'removeSuccess'    => __('Varianti rimosse.', 'fp-imgopt'),
                 'bulkBackgroundOk' => __('Bulk avviato in background. Esegue un batch ogni minuto.', 'fp-imgopt'),
+                'renameConfirm'    => __('Rinominare le immagini di questo contenuto?', 'fp-imgopt'),
+                'renameSuccess'    => __('Immagini rinominate.', 'fp-imgopt'),
+                'renameError'      => __('Errore durante il rinomina.', 'fp-imgopt'),
             ],
         ]);
     }
@@ -604,6 +619,59 @@ final class Plugin {
         FailedLog::clear();
         $this->invalidate_stats_cache();
         wp_send_json_success(['retried' => $retried, 'count' => count($ids)]);
+    }
+
+    /**
+     * AJAX: rinomina le immagini contenute in un post/pagina.
+     */
+    public function ajax_rename_post_images(): void {
+        if (!wp_verify_nonce($_REQUEST['nonce'] ?? '', 'fp_imgopt_admin')) {
+            wp_send_json_error(['message' => __('Errore di sicurezza.', 'fp-imgopt')], 403);
+        }
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Permessi insufficienti.', 'fp-imgopt')], 403);
+        }
+
+        $post_id = absint($_REQUEST['post_id'] ?? 0);
+        if (!$post_id) {
+            wp_send_json_error(['message' => __('ID post mancante.', 'fp-imgopt')]);
+        }
+
+        $post = get_post($post_id);
+        if (!$post || !in_array($post->post_type, ['post', 'page'], true)) {
+            wp_send_json_error(['message' => __('Post non valido.', 'fp-imgopt')]);
+        }
+
+        $ids = ContentImageExtractor::get_attachment_ids_from_post($post_id);
+        $to_rename = [];
+        foreach ($ids as $aid) {
+            $path = get_attached_file($aid);
+            if ($path && is_file($path)) {
+                $bn = pathinfo($path, PATHINFO_FILENAME);
+                if (!(bool) preg_match('/^.+-' . $aid . '$/', $bn)) {
+                    $to_rename[] = $aid;
+                }
+            }
+        }
+
+        $renamer = new ImageRenamer($this->settings);
+        $renamed = 0;
+        $errors  = [];
+
+        foreach ($to_rename as $aid) {
+            $result = $renamer->rename_attachment_for_post($aid, $post_id);
+            if (is_wp_error($result)) {
+                $errors[] = $result->get_error_message();
+            } elseif (!empty($result['renamed'])) {
+                $renamed++;
+            }
+        }
+
+        wp_send_json_success([
+            'renamed' => $renamed,
+            'total'   => count($to_rename),
+            'errors'  => $errors,
+        ]);
     }
 
     /**

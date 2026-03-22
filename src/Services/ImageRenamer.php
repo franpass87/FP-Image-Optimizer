@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FP\ImgOpt\Services;
 
 use FP\ImgOpt\Admin\Settings;
+use WP_Error;
 
 /**
  * Rinomina i file immagine secondo il pattern: nome-sito + slug-pagina + id.
@@ -131,6 +132,143 @@ final class ImageRenamer {
         $this->update_content_references($old_urls, $new_urls, $attachment_id, $base_url . $main_file, $base_url . $new_rel);
 
         return $metadata;
+    }
+
+    /**
+     * Rinomina un attachment usando un post specifico come contesto (per slug).
+     * Usato dalla pagina "Rinomina per pagina/articolo" per rename one-click.
+     *
+     * @param int $attachment_id ID dell'allegato
+     * @param int|null $context_post_id ID del post/pagina da cui prendere lo slug (null = usa parent o media)
+     * @return array{renamed: bool, message: string}|WP_Error
+     */
+    public function rename_attachment_for_post(int $attachment_id, ?int $context_post_id = null): array|WP_Error {
+        $metadata = wp_get_attachment_metadata($attachment_id);
+        if (!is_array($metadata) || empty($metadata['file'])) {
+            return new WP_Error('fp_imgopt_no_metadata', __('Metadata allegato non disponibile.', 'fp-imgopt'));
+        }
+
+        $upload_dir = wp_upload_dir();
+        if (!empty($upload_dir['error'])) {
+            return new WP_Error('fp_imgopt_upload_dir', $upload_dir['error']);
+        }
+
+        $base_dir  = trailingslashit($upload_dir['basedir']);
+        $base_url  = trailingslashit($upload_dir['baseurl']);
+        $rel_dir   = dirname($metadata['file'] ?? '');
+        $full_dir  = $base_dir . $rel_dir . '/';
+        $main_file = $metadata['file'] ?? '';
+
+        if (str_contains($main_file, '..')) {
+            return new WP_Error('fp_imgopt_invalid_path', __('Percorso non valido.', 'fp-imgopt'));
+        }
+        $main_path = $base_dir . $main_file;
+        if (!is_file($main_path) || !$this->is_renamable($main_path)) {
+            return new WP_Error('fp_imgopt_not_renamable', __('File non rinominabile.', 'fp-imgopt'));
+        }
+
+        $current_basename = pathinfo($main_file, PATHINFO_FILENAME);
+        if ($this->already_renamed($current_basename, $attachment_id)) {
+            return ['renamed' => false, 'message' => __('Già nel formato atteso.', 'fp-imgopt')];
+        }
+
+        $base_name = $this->build_base_name_with_context($attachment_id, $context_post_id);
+        $ext       = strtolower(pathinfo($main_file, PATHINFO_EXTENSION));
+        $new_name  = $base_name . '.' . $ext;
+        $new_name  = wp_unique_filename($full_dir, $new_name);
+
+        $new_rel   = $rel_dir ? $rel_dir . '/' . $new_name : $new_name;
+        $new_path  = $base_dir . $new_rel;
+
+        if ($new_path === $main_path) {
+            return ['renamed' => false, 'message' => __('Nessuna modifica necessaria.', 'fp-imgopt')];
+        }
+
+        if (!rename($main_path, $new_path)) {
+            return new WP_Error('fp_imgopt_rename_failed', __('Errore durante il rinomina.', 'fp-imgopt'));
+        }
+
+        $old_urls = [$base_url . $main_file];
+        $new_urls = [$base_url . $new_rel];
+        $rollback_pairs = [];
+
+        if (!empty($metadata['sizes']) && is_array($metadata['sizes'])) {
+            foreach ($metadata['sizes'] as $key => $size_data) {
+                $old_file = $size_data['file'] ?? '';
+                if (empty($old_file)) {
+                    continue;
+                }
+                $old_file = basename($old_file);
+                if ($old_file === '' || str_contains($old_file, '..')) {
+                    continue;
+                }
+                $old_full     = $full_dir . $old_file;
+                $size_ext     = strtolower(pathinfo($old_file, PATHINFO_EXTENSION));
+                $size_new     = $base_name . '-' . $key . '.' . $size_ext;
+                $size_new     = wp_unique_filename($full_dir, $size_new);
+                $size_path_new = $full_dir . $size_new;
+
+                if (is_file($old_full) && rename($old_full, $size_path_new)) {
+                    $metadata['sizes'][$key]['file'] = $size_new;
+                    $old_rel = $rel_dir ? $rel_dir . '/' . $old_file : $old_file;
+                    $new_rel_size = $rel_dir ? $rel_dir . '/' . $size_new : $size_new;
+                    $old_urls[] = $base_url . $old_rel;
+                    $new_urls[] = $base_url . $new_rel_size;
+                    $rollback_pairs[] = [$size_path_new, $old_full];
+                    $size_old_base = pathinfo($old_file, PATHINFO_FILENAME);
+                    $this->rename_variant_files($full_dir, $size_old_base, $base_name . '-' . $key);
+                } else {
+                    $this->rollback_renames($new_path, $main_path, $rollback_pairs);
+                    return new WP_Error('fp_imgopt_rename_failed', __('Errore rinomina dimensioni.', 'fp-imgopt'));
+                }
+            }
+        }
+
+        $this->rename_variant_files($full_dir, $current_basename, $base_name);
+
+        $metadata['file'] = $new_rel;
+        wp_update_attachment_metadata($attachment_id, $metadata);
+        update_attached_file($attachment_id, $new_path);
+
+        $this->update_content_references($old_urls, $new_urls, $attachment_id, $base_url . $main_file, $base_url . $new_rel);
+
+        return ['renamed' => true, 'message' => sprintf(__('Rinominato in %s', 'fp-imgopt'), $new_name)];
+    }
+
+    /**
+     * Rinomina i file varianti WebP e AVIF quando si rinomina l'immagine principale.
+     *
+     * @param string $dir Directory
+     * @param string $old_basename Nome file senza estensione (vecchio)
+     * @param string $new_basename Nome file senza estensione (nuovo)
+     */
+    private function rename_variant_files(string $dir, string $old_basename, string $new_basename): void {
+        foreach (['webp', 'avif'] as $ext) {
+            $old_path = $dir . $old_basename . '.' . $ext;
+            $new_path = $dir . $new_basename . '.' . $ext;
+            if (is_file($old_path) && $old_path !== $new_path && !is_file($new_path)) {
+                @rename($old_path, $new_path);
+            }
+        }
+    }
+
+    private function build_base_name_with_context(int $attachment_id, ?int $context_post_id): string {
+        $site = sanitize_title(get_bloginfo('name'));
+        $site = substr($site, 0, self::MAX_SITENAME_LENGTH) ?: 'sito';
+
+        $slug = 'media';
+        if ($context_post_id) {
+            $post = get_post($context_post_id);
+            if ($post && in_array($post->post_type, ['post', 'page'], true)) {
+                $slug = sanitize_title($post->post_name ?? 'media');
+            }
+        }
+        if ($slug === 'media') {
+            $slug = $this->get_context_slug($attachment_id);
+        }
+        $slug = substr($slug, 0, self::MAX_SLUG_LENGTH) ?: 'media';
+
+        return $site . '-' . $slug . '-' . $attachment_id;
     }
 
     private function build_base_name(int $attachment_id): string {

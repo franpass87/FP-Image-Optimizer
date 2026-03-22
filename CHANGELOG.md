@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1] - 2025-03-22
+
+### Fixed
+
+- **ImageRenamer**: rollback completo di tutte le dimensioni se una fallisce (evita thumbnail rotte)
+- **ImageConverter**: try/finally per liberare sempre risorse GD/Imagick
+- **ImageDuplicatorOnSave**: validazione copia (filesize > 0) e rimozione file vuoti
+
 ## [1.3.0] - 2025-03-22
 
 ### Added

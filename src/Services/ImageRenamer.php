@@ -90,6 +90,7 @@ final class ImageRenamer {
 
         $old_urls = [$base_url . $main_file];
         $new_urls = [$base_url . $new_rel];
+        $rollback_pairs = []; // [(from_path, to_path)] in ordine per rollback inverso
 
         if (!empty($metadata['sizes']) && is_array($metadata['sizes'])) {
             foreach ($metadata['sizes'] as $key => $size_data) {
@@ -97,7 +98,7 @@ final class ImageRenamer {
                 if (empty($old_file)) {
                     continue;
                 }
-                $old_full = $base_dir . $rel_dir . '/' . $old_file;
+                $old_full = $full_dir . $old_file;
                 $size_ext = strtolower(pathinfo($old_file, PATHINFO_EXTENSION));
                 $size_new = $base_name . '-' . $key . '.' . $size_ext;
                 $size_new = wp_unique_filename($full_dir, $size_new);
@@ -109,8 +110,9 @@ final class ImageRenamer {
                     $new_rel_size = $rel_dir ? $rel_dir . '/' . $size_new : $size_new;
                     $old_urls[] = $base_url . $old_rel;
                     $new_urls[] = $base_url . $new_rel_size;
+                    $rollback_pairs[] = [$size_path_new, $old_full];
                 } else {
-                    rename($new_path, $main_path);
+                    $this->rollback_renames($new_path, $main_path, $rollback_pairs);
                     return $metadata;
                 }
             }
@@ -176,6 +178,24 @@ final class ImageRenamer {
     private function is_renamable(string $path): bool {
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
         return in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'], true);
+    }
+
+    /**
+     * Rollback completo: ripristina main file e tutte le dimensioni rinominate.
+     *
+     * @param string $main_new_path Path del main file dopo rename
+     * @param string $main_old_path Path originale del main file
+     * @param array<int, array{0: string, 1: string}> $size_rollback_pairs Coppie [new_path, old_path] per ogni size
+     */
+    private function rollback_renames(string $main_new_path, string $main_old_path, array $size_rollback_pairs): void {
+        foreach (array_reverse($size_rollback_pairs) as [$from, $to]) {
+            if (is_file($from)) {
+                rename($from, $to);
+            }
+        }
+        if (is_file($main_new_path)) {
+            rename($main_new_path, $main_old_path);
+        }
     }
 
     /**

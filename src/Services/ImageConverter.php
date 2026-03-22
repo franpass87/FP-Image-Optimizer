@@ -139,35 +139,37 @@ final class ImageConverter {
             return $result;
         }
 
-        $base = pathinfo($path, PATHINFO_DIRNAME) . '/' . pathinfo($path, PATHINFO_FILENAME);
+        try {
+            $base = pathinfo($path, PATHINFO_DIRNAME) . '/' . pathinfo($path, PATHINFO_FILENAME);
 
-        if ($do_webp) {
-            $webp_path = $base . '.webp';
-            if ($this->is_valid_image_file($webp_path)) {
-                $result['webp'] = true;
-            } elseif ($this->save_webp($image, $webp_path)) {
+            if ($do_webp) {
+                $webp_path = $base . '.webp';
                 if ($this->is_valid_image_file($webp_path)) {
                     $result['webp'] = true;
-                } else {
-                    @unlink($webp_path);
+                } elseif ($this->save_webp($image, $webp_path)) {
+                    if ($this->is_valid_image_file($webp_path)) {
+                        $result['webp'] = true;
+                    } else {
+                        @unlink($webp_path);
+                    }
                 }
             }
-        }
 
-        if ($do_avif) {
-            $avif_path = $base . '.avif';
-            if ($this->is_valid_image_file($avif_path)) {
-                $result['avif'] = true;
-            } elseif ($this->save_avif($image, $avif_path)) {
+            if ($do_avif) {
+                $avif_path = $base . '.avif';
                 if ($this->is_valid_image_file($avif_path)) {
                     $result['avif'] = true;
-                } else {
-                    @unlink($avif_path);
+                } elseif ($this->save_avif($image, $avif_path)) {
+                    if ($this->is_valid_image_file($avif_path)) {
+                        $result['avif'] = true;
+                    } else {
+                        @unlink($avif_path);
+                    }
                 }
             }
+        } finally {
+            $this->free_image($image);
         }
-
-        $this->free_image($image);
 
         return $result;
     }

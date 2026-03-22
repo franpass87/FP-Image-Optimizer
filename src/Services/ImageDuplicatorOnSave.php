@@ -106,7 +106,7 @@ final class ImageDuplicatorOnSave {
                 $new_file = wp_unique_filename($full_dir, $new_file);
                 $new_path = $full_dir . $new_file;
 
-                if (copy($old_path, $new_path)) {
+                if (copy($old_path, $new_path) && filesize($new_path) > 0) {
                     $old_rel = $rel_dir ? $rel_dir . '/' . $old_file : $old_file;
                     $new_rel = $rel_dir ? $rel_dir . '/' . $new_file : $new_file;
                     $replacements[$base_url . $old_rel] = $base_url . $new_rel;
@@ -114,6 +114,8 @@ final class ImageDuplicatorOnSave {
                     if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif'], true)) {
                         $converter->convert_file($new_path);
                     }
+                } elseif (is_file($new_path)) {
+                    @unlink($new_path);
                 }
             }
         }

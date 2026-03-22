@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0] - 2025-03-22
+
+### Added
+
+- **Attributi SEO (alt, title, caption)**: genera automaticamente alt text, title e caption dall'immagine contestuale (titolo pagina, slug). Solo se vuoti
+- Toggle "Attributi SEO" nelle impostazioni: applica SEO all'upload e al salvataggio del post
+
 ## [1.2.0] - 2025-03-22
 
 ### Added

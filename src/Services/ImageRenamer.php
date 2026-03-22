@@ -31,6 +31,12 @@ final class ImageRenamer {
      * @return array<string, mixed>
      */
     public function on_generate_metadata(array $metadata, int $attachment_id): array {
+        if ($this->settings->get('seo_attributes', false)) {
+            $slug  = $this->get_context_slug($attachment_id);
+            $title = $this->get_context_title($attachment_id);
+            ImageSeoHelper::ensure_seo_attributes($attachment_id, $title, $slug);
+        }
+
         if (!$this->settings->get('rename_files', false)) {
             return $metadata;
         }
@@ -148,6 +154,23 @@ final class ImageRenamer {
         }
 
         return 'media';
+    }
+
+    private function get_context_title(int $attachment_id): string {
+        $parent = (int) get_post_field('post_parent', $attachment_id);
+        if ($parent > 0) {
+            $post = get_post($parent);
+            if ($post && in_array($post->post_type, ['post', 'page'], true)) {
+                return (string) ($post->post_title ?? '');
+            }
+        }
+        if (isset($_REQUEST['post_id']) && absint($_REQUEST['post_id']) > 0) {
+            $post = get_post(absint($_REQUEST['post_id']));
+            if ($post && in_array($post->post_type, ['post', 'page'], true)) {
+                return (string) ($post->post_title ?? '');
+            }
+        }
+        return '';
     }
 
     private function is_renamable(string $path): bool {

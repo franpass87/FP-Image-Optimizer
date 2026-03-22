@@ -27,7 +27,12 @@ final class ImageDuplicatorOnSave {
     }
 
     public function on_save_post(int $post_id): void {
-        if (self::$running || !$this->settings->get('duplicate_on_save', false)) {
+        if (self::$running) {
+            return;
+        }
+        $do_duplicate = $this->settings->get('duplicate_on_save', false);
+        $do_seo       = $this->settings->get('seo_attributes', false);
+        if (!$do_duplicate && !$do_seo) {
             return;
         }
 
@@ -43,6 +48,22 @@ final class ImageDuplicatorOnSave {
 
         $attachment_ids = $this->extract_attachment_ids($content);
         if (empty($attachment_ids)) {
+            return;
+        }
+
+        $post_title = $post->post_title ?? '';
+        $post_slug  = $post->post_name ?? 'media';
+
+        if ($do_seo) {
+            foreach (array_unique($attachment_ids) as $att_id) {
+                $att_id = (int) $att_id;
+                if ($att_id > 0) {
+                    ImageSeoHelper::ensure_seo_attributes($att_id, $post_title, $post_slug);
+                }
+            }
+        }
+
+        if (!$do_duplicate) {
             return;
         }
 

@@ -129,6 +129,17 @@ final class SettingsPage {
                     </label>
                 </div>
 
+                <div class="fpimgopt-toggle-row">
+                    <div class="fpimgopt-toggle-info">
+                        <strong><?php echo esc_html__('Attributi SEO (alt, title, caption)', 'fp-imgopt'); ?></strong>
+                        <span><?php echo esc_html__('Genera automaticamente alt text, title e caption dall\'immagine contestuale (titolo pagina, slug). Solo se vuoti.', 'fp-imgopt'); ?></span>
+                    </div>
+                    <label class="fpimgopt-toggle">
+                        <input type="checkbox" name="fp_imgopt_settings[seo_attributes]" value="1" <?php checked(!empty($data['seo_attributes'])); ?>>
+                        <span class="fpimgopt-toggle-slider"></span>
+                    </label>
+                </div>
+
                 <div class="fpimgopt-fields-grid" style="margin-top: 20px;">
                     <div class="fpimgopt-toggle-row">
                         <div class="fpimgopt-toggle-info">

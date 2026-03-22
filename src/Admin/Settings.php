@@ -21,6 +21,7 @@ final class Settings {
         'on_upload'       => true,
         'rename_files'      => false,
         'duplicate_on_save' => false,
+        'seo_attributes'    => false,
     ];
 
     private array $data;
@@ -54,6 +55,7 @@ final class Settings {
             'on_upload'       => !empty($data['on_upload']),
             'rename_files'      => !empty($data['rename_files']),
             'duplicate_on_save' => !empty($data['duplicate_on_save']),
+            'seo_attributes'    => !empty($data['seo_attributes']),
         ];
         update_option(self::OPTION_KEY, $sanitized);
         $this->data = wp_parse_args($sanitized, self::DEFAULTS);

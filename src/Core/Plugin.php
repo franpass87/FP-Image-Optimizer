@@ -75,7 +75,7 @@ final class Plugin {
             add_filter('post_thumbnail_html', [$replacer, 'replace_thumbnail'], 10, 5);
         }
 
-        if ($this->settings->get('duplicate_on_save', false)) {
+        if ($this->settings->get('duplicate_on_save', false) || $this->settings->get('seo_attributes', false)) {
             $duplicator = new ImageDuplicatorOnSave($this->settings);
             add_action('save_post', [$duplicator, 'on_save_post'], 20, 1);
         }

@@ -58,6 +58,47 @@ final class SettingsPage {
         </span>
     </div>
 
+    <?php
+    $stats = get_transient('fp_imgopt_stats');
+    $stats = is_array($stats) ? $stats : null;
+    ?>
+    <div class="fpimgopt-card fpimgopt-stats-card">
+        <div class="fpimgopt-card-header">
+            <div class="fpimgopt-card-header-left">
+                <span class="dashicons dashicons-chart-bar"></span>
+                <h2><?php echo esc_html__('Statistiche', 'fp-imgopt'); ?></h2>
+            </div>
+            <button type="button" id="fpimgopt-stats-refresh" class="fpimgopt-btn fpimgopt-btn-secondary fpimgopt-btn-sm">
+                <span class="dashicons dashicons-update"></span>
+                <?php echo esc_html__('Aggiorna statistiche', 'fp-imgopt'); ?>
+            </button>
+        </div>
+        <div class="fpimgopt-card-body">
+            <div class="fpimgopt-stats-grid">
+                <div class="fpimgopt-stat-item">
+                    <span class="fpimgopt-stat-value" id="fpimgopt-stat-total"><?php echo $stats ? (int) $stats['total_images'] : '—'; ?></span>
+                    <span class="fpimgopt-stat-label"><?php echo esc_html__('Immagini totali', 'fp-imgopt'); ?></span>
+                </div>
+                <div class="fpimgopt-stat-item">
+                    <span class="fpimgopt-stat-value" id="fpimgopt-stat-converted"><?php echo $stats ? (int) $stats['with_variants'] : '—'; ?></span>
+                    <span class="fpimgopt-stat-label"><?php echo esc_html__('Con varianti', 'fp-imgopt'); ?></span>
+                </div>
+                <div class="fpimgopt-stat-item">
+                    <span class="fpimgopt-stat-value" id="fpimgopt-stat-webp"><?php echo $stats ? (int) $stats['webp_count'] : '—'; ?></span>
+                    <span class="fpimgopt-stat-label"><?php echo esc_html__('File WebP', 'fp-imgopt'); ?></span>
+                </div>
+                <div class="fpimgopt-stat-item">
+                    <span class="fpimgopt-stat-value" id="fpimgopt-stat-avif"><?php echo $stats ? (int) $stats['avif_count'] : '—'; ?></span>
+                    <span class="fpimgopt-stat-label"><?php echo esc_html__('File AVIF', 'fp-imgopt'); ?></span>
+                </div>
+                <div class="fpimgopt-stat-item fpimgopt-stat-highlight">
+                    <span class="fpimgopt-stat-value" id="fpimgopt-stat-saved"><?php echo $stats ? esc_html((string) $stats['saved_mb'] . ' MB') : '—'; ?></span>
+                    <span class="fpimgopt-stat-label"><?php echo esc_html__('Risparmio stimato', 'fp-imgopt'); ?></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <form method="post" action="">
         <?php wp_nonce_field('fp_imgopt_save_settings', 'fp_imgopt_nonce'); ?>
 
@@ -196,6 +237,15 @@ final class SettingsPage {
         <div class="fpimgopt-card-body">
             <p class="description"><?php echo esc_html__('Per convertire le immagini già presenti: vai su Media → Libreria, passa con il mouse su un\'immagine e clicca su "Converti in WebP/AVIF". Le immagini originali non vengono mai modificate o eliminate.', 'fp-imgopt'); ?></p>
             <p><?php echo esc_html__('Le nuove immagini caricate verranno convertite automaticamente se "Conversione al caricamento" è attiva.', 'fp-imgopt'); ?></p>
+            <div class="fpimgopt-bulk-box">
+                <button type="button" id="fpimgopt-bulk-start" class="fpimgopt-btn fpimgopt-btn-primary">
+                    <span class="dashicons dashicons-update"></span>
+                    <?php echo esc_html__('Avvia Bulk Optimizer sicuro', 'fp-imgopt'); ?>
+                </button>
+                <p id="fpimgopt-bulk-status" class="fpimgopt-bulk-status">
+                    <?php echo esc_html__('Converte in batch le immagini già presenti senza modificare gli originali.', 'fp-imgopt'); ?>
+                </p>
+            </div>
         </div>
     </div>
 

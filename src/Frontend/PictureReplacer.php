@@ -8,6 +8,9 @@ use FP\ImgOpt\Admin\Settings;
 
 /**
  * Sostituisce i tag <img> con <picture> per servire WebP/AVIF con fallback.
+ *
+ * Supporta srcset responsive: se l'img ha srcset con più dimensioni,
+ * genera source con srcset completo per WebP e AVIF.
  */
 final class PictureReplacer {
 
@@ -65,37 +68,137 @@ final class PictureReplacer {
         $before = $matches[1];
         $src    = $matches[2];
         $after  = $matches[3];
+        $full   = $matches[0];
 
-        $variants = $this->get_variant_urls($src);
-        if (empty($variants)) {
-            return $matches[0];
+        if ((bool) apply_filters('fp_imgopt_skip_picture_replace', false, $src)) {
+            return $full;
+        }
+
+        $srcset_sizes = $this->parse_srcset_sizes($before . ' ' . $after);
+        $urls         = $this->collect_srcset_urls($src, $srcset_sizes['srcset']);
+        $variants     = $this->get_variant_srcsets($urls);
+
+        $variants = apply_filters('fp_imgopt_variant_urls', $variants, $src);
+        if (empty($variants['avif']) && empty($variants['webp'])) {
+            return $full;
         }
 
         $sources = '';
         if (($this->settings->get('format_avif', true)) && !empty($variants['avif'])) {
-            $sources .= sprintf(
-                '<source type="image/avif" srcset="%s">',
-                esc_url($variants['avif'])
+            $sizes_attr = $srcset_sizes['sizes'] !== '' ? ' sizes="' . esc_attr($srcset_sizes['sizes']) . '"' : '';
+            $sources   .= sprintf(
+                '<source type="image/avif" srcset="%s"%s>',
+                esc_attr($variants['avif']),
+                $sizes_attr
             );
         }
         if (($this->settings->get('format_webp', true)) && !empty($variants['webp'])) {
-            $sources .= sprintf(
-                '<source type="image/webp" srcset="%s">',
-                esc_url($variants['webp'])
+            $sizes_attr = $srcset_sizes['sizes'] !== '' ? ' sizes="' . esc_attr($srcset_sizes['sizes']) . '"' : '';
+            $sources   .= sprintf(
+                '<source type="image/webp" srcset="%s"%s>',
+                esc_attr($variants['webp']),
+                $sizes_attr
             );
         }
 
         if ($sources === '') {
-            return $matches[0];
+            return $full;
         }
 
-        return sprintf(
+        $picture = sprintf(
             '<picture>%s<img%ssrc="%s"%s loading="lazy" decoding="async"></picture>',
             $sources,
             $before,
             esc_url($src),
             $after
         );
+
+        return (string) apply_filters('fp_imgopt_picture_html', $picture, $src, $variants);
+    }
+
+    /**
+     * Estrae srcset e sizes dall'attributo after.
+     *
+     * @return array{srcset: string, sizes: string}
+     */
+    private function parse_srcset_sizes(string $attrs): array {
+        $srcset = '';
+        $sizes  = '';
+        if (preg_match('/srcset\s*=\s*["\']([^"\']+)["\']/i', $attrs, $m)) {
+            $srcset = trim($m[1]);
+        }
+        if (preg_match('/sizes\s*=\s*["\']([^"\']+)["\']/i', $attrs, $m)) {
+            $sizes = trim($m[1]);
+        }
+        return ['srcset' => $srcset, 'sizes' => $sizes];
+    }
+
+    /**
+     * Raccoglie gli URL da src e srcset con i relativi descriptor.
+     *
+     * @return array<int, array{url: string, descriptor: string}>
+     */
+    private function collect_srcset_urls(string $src, string $srcset_str): array {
+        $collected = [];
+        $seen_urls = [];
+
+        if ($srcset_str !== '') {
+            foreach (array_map('trim', explode(',', $srcset_str)) as $part) {
+                if ($part === '') {
+                    continue;
+                }
+                if (preg_match('/^(.+?)\s+([\d.]+[wx])$/i', $part, $m)) {
+                    $url        = trim($m[1]);
+                    $descriptor = $m[2];
+                } else {
+                    $url        = $part;
+                    $descriptor = '1x';
+                }
+                $url_clean = strtok($url, '?');
+                if ($url_clean && !isset($seen_urls[$url_clean])) {
+                    $seen_urls[$url_clean] = true;
+                    $collected[]          = ['url' => $url_clean, 'descriptor' => $descriptor];
+                }
+            }
+        }
+
+        $src_clean = strtok($src, '?') ?: $src;
+        if (!isset($seen_urls[$src_clean])) {
+            $collected[] = ['url' => $src_clean, 'descriptor' => '1x'];
+        }
+
+        return $collected;
+    }
+
+    /**
+     * Costruisce stringhe srcset per WebP e AVIF da una lista di URL.
+     *
+     * @param array<int, array{url: string, descriptor: string}> $urls
+     * @return array{webp?: string, avif?: string}
+     */
+    private function get_variant_srcsets(array $urls): array {
+        $webp_parts = [];
+        $avif_parts = [];
+
+        foreach ($urls as $item) {
+            $variants = $this->get_variant_urls($item['url']);
+            if (!empty($variants['webp'])) {
+                $webp_parts[] = esc_url($variants['webp']) . ' ' . $item['descriptor'];
+            }
+            if (!empty($variants['avif'])) {
+                $avif_parts[] = esc_url($variants['avif']) . ' ' . $item['descriptor'];
+            }
+        }
+
+        $result = [];
+        if ($webp_parts !== []) {
+            $result['webp'] = implode(', ', $webp_parts);
+        }
+        if ($avif_parts !== []) {
+            $result['avif'] = implode(', ', $avif_parts);
+        }
+
+        return $result;
     }
 
     /**

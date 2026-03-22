@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0] - 2025-03-22
+
+### Added
+
+- **srcset responsive**: il tag `<picture>` genera ora `srcset` completo per WebP e AVIF quando l'immagine originale ha più dimensioni (responsive images)
+- **Hook e filtri**: `fp_imgopt_skip_picture_replace`, `fp_imgopt_variant_urls`, `fp_imgopt_picture_html`, `fp_imgopt_attachment_converted` per estensibilità
+- **Dashboard statistiche**: card con immagini totali, convertite, file WebP/AVIF, risparmio stimato in MB; pulsante "Aggiorna statistiche"
+
 ## [1.3.3] - 2025-03-22
 
 ### Fixed

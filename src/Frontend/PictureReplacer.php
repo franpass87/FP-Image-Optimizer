@@ -119,9 +119,17 @@ final class PictureReplacer {
 
         $rel_path  = substr($url_clean, strlen($base_url));
         $rel_path  = ltrim(str_replace('\\', '/', $rel_path), '/');
-        $full_path = $base_dir . '/' . $rel_path;
+        if ($rel_path === '' || str_contains($rel_path, '..')) {
+            return [];
+        }
+        $full_path = rtrim($base_dir, '/\\') . '/' . $rel_path;
 
-        if (!is_file($full_path)) {
+        $base_real = realpath($base_dir);
+        $path_real = realpath($full_path);
+        if (!$base_real || !$path_real || !is_file($full_path)) {
+            return [];
+        }
+        if (strpos($path_real, $base_real) !== 0) {
             return [];
         }
 

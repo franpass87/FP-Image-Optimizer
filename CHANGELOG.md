@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.2] - 2025-03-22
+
+### Fixed
+
+- **PictureReplacer**: validazione path contro traversal (..) e verifica che il file sia dentro uploads
+
 ## [1.3.1] - 2025-03-22
 
 ### Fixed

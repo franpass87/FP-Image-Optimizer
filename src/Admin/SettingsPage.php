@@ -107,6 +107,17 @@ final class SettingsPage {
                     </label>
                 </div>
 
+                <div class="fpimgopt-toggle-row">
+                    <div class="fpimgopt-toggle-info">
+                        <strong><?php echo esc_html__('Rinomina file immagine', 'fp-imgopt'); ?></strong>
+                        <span><?php echo esc_html__('Rinomina le immagini con formato nome-sito-slug-pagina-id (es. mio-sito-contatti-456.jpg). Migliora SEO.', 'fp-imgopt'); ?></span>
+                    </div>
+                    <label class="fpimgopt-toggle">
+                        <input type="checkbox" name="fp_imgopt_settings[rename_files]" value="1" <?php checked(!empty($data['rename_files'])); ?>>
+                        <span class="fpimgopt-toggle-slider"></span>
+                    </label>
+                </div>
+
                 <div class="fpimgopt-fields-grid" style="margin-top: 20px;">
                     <div class="fpimgopt-toggle-row">
                         <div class="fpimgopt-toggle-info">

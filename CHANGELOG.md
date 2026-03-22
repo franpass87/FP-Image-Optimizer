@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.0] - 2025-03-22
+
+### Added
+
+- Rinominamento automatico file immagine: formato `nome-sito-slug-pagina-id` (es. `mio-sito-contatti-456.jpg`)
+- Contesto da pagina/post genitore o da "media" se non associato
+- Aggiornamento riferimenti nel contenuto dei post e nel guid
+- Toggle "Rinomina file immagine" nelle impostazioni
+- Rinominamento anche da azione "Converti in WebP/AVIF" se l'opzione è attiva
+
 ## [1.0.0] - 2025-03-22
 
 ### Added

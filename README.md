@@ -1,6 +1,6 @@
 # FP Image Optimizer
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 
 Plugin WordPress che converte le immagini della Media Library in **WebP** e **AVIF** per ridurre il peso e migliorare le performance di caricamento.
 
@@ -10,6 +10,7 @@ Plugin WordPress che converte le immagini della Media Library in **WebP** e **AV
 - **Sostituzione nel contenuto**: usa il tag `<picture>` per servire WebP/AVIF ai browser compatibili, con fallback al formato originale
 - **Conversione manuale**: azione "Converti in WebP/AVIF" nella Media Library per le immagini esistenti
 - **Configurabile**: abilita/disabilita formati, imposta qualità, attiva/disattiva la sostituzione nel frontend
+- **Rinominamento SEO**: rinomina le immagini con formato `nome-sito-slug-pagina-id` (simile ai plugin renamer)
 
 ## Requisiti
 
@@ -67,4 +68,3 @@ FP-Image-Optimizer/
 - Sito: [francescopasseri.com](https://francescopasseri.com)
 - Email: [info@francescopasseri.com](mailto:info@francescopasseri.com)
 - GitHub: [github.com/franpass87](https://github.com/franpass87)
-# FP-Image-Optimizer

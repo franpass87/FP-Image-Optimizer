@@ -8,6 +8,7 @@ use FP\ImgOpt\Admin\Settings;
 use FP\ImgOpt\Admin\SettingsPage;
 use FP\ImgOpt\Frontend\PictureReplacer;
 use FP\ImgOpt\Services\ImageConverter;
+use FP\ImgOpt\Services\ImageRenamer;
 
 /**
  * Bootstrap del plugin FP Image Optimizer.
@@ -62,7 +63,9 @@ final class Plugin {
             return;
         }
 
+        $renamer  = new ImageRenamer($this->settings);
         $converter = new ImageConverter($this->settings);
+        add_filter('wp_generate_attachment_metadata', [$renamer, 'on_generate_metadata'], 5, 2);
         add_filter('wp_generate_attachment_metadata', [$converter, 'on_generate_metadata'], 10, 2);
 
         if ($this->settings->get('replace_content', true)) {
@@ -175,6 +178,15 @@ final class Plugin {
                 wp_send_json_error(['message' => __('Permessi insufficienti.', 'fp-imgopt')], 403);
             }
             wp_die(__('Permessi insufficienti.', 'fp-imgopt'));
+        }
+
+        if ($this->settings->get('rename_files', false)) {
+            $renamer = new ImageRenamer($this->settings);
+            $metadata = wp_get_attachment_metadata($attachment_id);
+            if (is_array($metadata)) {
+                $metadata = $renamer->on_generate_metadata($metadata, $attachment_id);
+                wp_update_attachment_metadata($attachment_id, $metadata);
+            }
         }
 
         $converter = new ImageConverter($this->settings);

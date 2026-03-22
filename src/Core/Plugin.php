@@ -180,15 +180,7 @@ final class Plugin {
             wp_die(__('Permessi insufficienti.', 'fp-imgopt'));
         }
 
-        if ($this->settings->get('rename_files', false)) {
-            $renamer = new ImageRenamer($this->settings);
-            $metadata = wp_get_attachment_metadata($attachment_id);
-            if (is_array($metadata)) {
-                $metadata = $renamer->on_generate_metadata($metadata, $attachment_id);
-                wp_update_attachment_metadata($attachment_id, $metadata);
-            }
-        }
-
+        // Non rinomina mai immagini esistenti: solo conversione. Il rename avviene solo su nuovi upload.
         $converter = new ImageConverter($this->settings);
         $result    = $converter->convert_attachment($attachment_id);
 

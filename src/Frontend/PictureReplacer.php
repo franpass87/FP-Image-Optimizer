@@ -130,14 +130,20 @@ final class PictureReplacer {
         $filename  = $path_info['filename'];
         $result    = [];
 
+        $base_dir_real = trailingslashit(realpath($base_dir) ?: $base_dir);
+        $dir_real      = realpath($dir) ?: $dir;
+        $rel_from_base = str_replace($base_dir_real, '', trailingslashit($dir_real));
+        $rel_from_base = ltrim(str_replace('\\', '/', $rel_from_base), '/');
+        $base_url_t    = trailingslashit($base_url);
+
         $webp_path = $dir . $filename . '.webp';
         if ($this->settings->get('format_webp', true) && is_file($webp_path)) {
-            $result['webp'] = str_replace($base_dir, $base_url, $webp_path);
+            $result['webp'] = $base_url_t . $rel_from_base . $filename . '.webp';
         }
 
         $avif_path = $dir . $filename . '.avif';
         if ($this->settings->get('format_avif', true) && is_file($avif_path)) {
-            $result['avif'] = str_replace($base_dir, $base_url, $avif_path);
+            $result['avif'] = $base_url_t . $rel_from_base . $filename . '.avif';
         }
 
         return $result;

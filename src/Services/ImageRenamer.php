@@ -35,6 +35,11 @@ final class ImageRenamer {
             return $metadata;
         }
 
+        $created = get_post_time('U', true, $attachment_id);
+        if ($created && (time() - $created) > 120) {
+            return $metadata;
+        }
+
         $upload_dir = wp_upload_dir();
         if (!empty($upload_dir['error'])) {
             return $metadata;
@@ -55,6 +60,11 @@ final class ImageRenamer {
             return $metadata;
         }
 
+        $current_basename = pathinfo($main_file, PATHINFO_FILENAME);
+        if ($this->already_renamed($current_basename, $attachment_id)) {
+            return $metadata;
+        }
+
         $base_name = $this->build_base_name($attachment_id);
         $ext       = strtolower(pathinfo($main_file, PATHINFO_EXTENSION));
         $new_name  = $base_name . '.' . $ext;
@@ -71,8 +81,6 @@ final class ImageRenamer {
         if (!rename($main_path, $new_path)) {
             return $metadata;
         }
-
-        $metadata['file'] = $new_rel;
 
         $old_urls = [$base_url . $main_file];
         $new_urls = [$base_url . $new_rel];
@@ -95,10 +103,14 @@ final class ImageRenamer {
                     $new_rel_size = $rel_dir ? $rel_dir . '/' . $size_new : $size_new;
                     $old_urls[] = $base_url . $old_rel;
                     $new_urls[] = $base_url . $new_rel_size;
+                } else {
+                    rename($new_path, $main_path);
+                    return $metadata;
                 }
             }
         }
 
+        $metadata['file'] = $new_rel;
         update_attached_file($attachment_id, $new_path);
 
         $this->update_content_references($old_urls, $new_urls, $attachment_id, $base_url . $main_file, $base_url . $new_rel);
@@ -141,6 +153,13 @@ final class ImageRenamer {
     private function is_renamable(string $path): bool {
         $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
         return in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'], true);
+    }
+
+    /**
+     * Evita doppio rename: se il filename è già nel formato sitename-slug-id.
+     */
+    private function already_renamed(string $basename, int $attachment_id): bool {
+        return (bool) preg_match('/^.+-' . $attachment_id . '$/', $basename);
     }
 
     /**

@@ -110,7 +110,7 @@ final class SettingsPage {
                 <div class="fpimgopt-toggle-row">
                     <div class="fpimgopt-toggle-info">
                         <strong><?php echo esc_html__('Rinomina file immagine', 'fp-imgopt'); ?></strong>
-                        <span><?php echo esc_html__('Rinomina le immagini con formato nome-sito-slug-pagina-id (es. mio-sito-contatti-456.jpg). Migliora SEO.', 'fp-imgopt'); ?></span>
+                        <span><?php echo esc_html__('Solo nuovi upload: formato nome-sito-slug-pagina-id (es. mio-sito-contatti-456.jpg). Le immagini esistenti non vengono mai rinominate.', 'fp-imgopt'); ?></span>
                     </div>
                     <label class="fpimgopt-toggle">
                         <input type="checkbox" name="fp_imgopt_settings[rename_files]" value="1" <?php checked(!empty($data['rename_files'])); ?>>
@@ -172,7 +172,7 @@ final class SettingsPage {
             </div>
         </div>
         <div class="fpimgopt-card-body">
-            <p class="description"><?php echo esc_html__('Per convertire le immagini già presenti: vai su Media → Libreria, passa con il mouse su un\'immagine e clicca su "Converti in WebP/AVIF".', 'fp-imgopt'); ?></p>
+            <p class="description"><?php echo esc_html__('Per convertire le immagini già presenti: vai su Media → Libreria, passa con il mouse su un\'immagine e clicca su "Converti in WebP/AVIF". Le immagini originali non vengono mai modificate o eliminate.', 'fp-imgopt'); ?></p>
             <p><?php echo esc_html__('Le nuove immagini caricate verranno convertite automaticamente se "Conversione al caricamento" è attiva.', 'fp-imgopt'); ?></p>
         </div>
     </div>

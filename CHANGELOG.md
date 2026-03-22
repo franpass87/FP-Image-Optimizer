@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.1] - 2025-03-22
+
+### Fixed
+
+- **Sicurezza siti esistenti**: le immagini già presenti non vengono mai rinominate (solo nuovi upload)
+- Rimosso rename dall'azione "Converti" in Media Library
+- Rollback automatico se il rename delle dimensioni fallisce
+- Skip rename se il file è già nel formato atteso o se l'allegato ha più di 2 minuti
+- PictureReplacer: corretta costruzione URL per CDN e domini custom
+
 ## [1.1.0] - 2025-03-22
 
 ### Added

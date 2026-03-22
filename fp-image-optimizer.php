@@ -10,6 +10,7 @@
  * Author URI:        https://francescopasseri.com
  * License:           Proprietary
  * Text Domain:       fp-imgopt
+ * Domain Path:       /languages
  * GitHub Plugin URI: franpass87/FP-Image-Optimizer
  * Primary Branch:    main
  */
@@ -37,5 +38,6 @@ if (!file_exists(FP_IMGOPT_DIR . 'vendor/autoload.php')) {
 require_once FP_IMGOPT_DIR . 'vendor/autoload.php';
 
 add_action('plugins_loaded', static function (): void {
+    load_plugin_textdomain('fp-imgopt', false, dirname(plugin_basename(__FILE__)) . '/languages');
     \FP\ImgOpt\Core\Plugin::instance()->init();
 });

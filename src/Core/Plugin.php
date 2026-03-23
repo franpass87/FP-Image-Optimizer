@@ -145,7 +145,7 @@ final class Plugin {
             'fp-imgopt',
             [new SettingsPage($this->settings), 'render'],
             'dashicons-images-alt2',
-            58
+            '56.4'
         );
         add_submenu_page(
             'fp-imgopt',

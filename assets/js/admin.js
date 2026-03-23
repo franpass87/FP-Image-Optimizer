@@ -268,6 +268,69 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         const renameBtns = document.querySelectorAll('.fpimgopt-rename-post-btn');
+
+        function getOrCreateRenameFeedback(btn) {
+            const actionCell = btn.closest('td');
+            if (!actionCell) {
+                return null;
+            }
+
+            let feedback = actionCell.querySelector('.fpimgopt-rename-feedback');
+            if (!feedback) {
+                feedback = document.createElement('p');
+                feedback.className = 'description fpimgopt-rename-feedback';
+                feedback.style.marginTop = '8px';
+                actionCell.appendChild(feedback);
+            }
+
+            return feedback;
+        }
+
+        function setRenameFeedback(btn, message, status) {
+            const feedback = getOrCreateRenameFeedback(btn);
+            if (!feedback) {
+                return;
+            }
+
+            feedback.textContent = message;
+            feedback.style.color = status === 'error' ? '#b32d2e' : '#2271b1';
+        }
+
+        function updateRowRenameStatus(btn, renamed, total) {
+            const row = btn.closest('tr');
+            if (!row) {
+                return;
+            }
+
+            const imageCell = row.cells && row.cells.length > 1 ? row.cells[1] : null;
+            const actionCell = row.cells && row.cells.length > 2 ? row.cells[2] : null;
+            const remaining = Math.max(total - renamed, 0);
+
+            if (imageCell) {
+                let countLabel = imageCell.querySelector('.fpimgopt-rename-count');
+                if (!countLabel) {
+                    countLabel = imageCell.querySelector('.description');
+                }
+                if (!countLabel) {
+                    countLabel = document.createElement('span');
+                    countLabel.className = 'description fpimgopt-rename-count';
+                    countLabel.style.marginLeft = '6px';
+                    imageCell.appendChild(countLabel);
+                }
+
+                if (remaining === 0) {
+                    countLabel.textContent = '';
+                } else {
+                    countLabel.textContent = '(' + remaining + ' da rinominare)';
+                }
+            }
+
+            if (actionCell && remaining === 0) {
+                var allDoneLabel = (fpImgOptConfig.i18n && fpImgOptConfig.i18n.renameAllDone) || 'Tutte gia rinominate';
+                actionCell.innerHTML = '<span class="description">' + allDoneLabel + '</span>';
+            }
+        }
+
         renameBtns.forEach(function (btn) {
             btn.addEventListener('click', function () {
                 const postId = btn.getAttribute('data-post-id');
@@ -290,20 +353,33 @@
                     .then(function (r) { return r.json(); })
                     .then(function (p) {
                         if (p && p.success && p.data) {
-                            var msg = (fpImgOptConfig.i18n && fpImgOptConfig.i18n.renameSuccess) || 'Rinominate.';
-                            if (p.data.renamed !== undefined) msg += ' ' + p.data.renamed + '/' + (p.data.total || 0);
+                            var total = Number(p.data.total || 0);
+                            var renamed = Number(p.data.renamed || 0);
+                            var msg;
+
+                            if (total === 0) {
+                                msg = (fpImgOptConfig.i18n && fpImgOptConfig.i18n.renameNothingToDo) || 'Nessuna immagine da rinominare: sono gia nel formato corretto.';
+                            } else {
+                                msg = (fpImgOptConfig.i18n && fpImgOptConfig.i18n.renameSuccess) || 'Rinominate.';
+                                msg += ' ' + renamed + '/' + total;
+                            }
+
                             if (p.data.errors && p.data.errors.length) msg += ' (' + p.data.errors.length + ' errori)';
-                            alert(msg);
-                            if (typeof location !== 'undefined') location.reload();
+                            setRenameFeedback(btn, msg, (p.data.errors && p.data.errors.length) ? 'error' : 'success');
+                            updateRowRenameStatus(btn, renamed, total);
+                            if (total > 0 && renamed < total) {
+                                btn.disabled = false;
+                                btn.innerHTML = origHtml;
+                            }
                         } else {
                             var errMsg = ((fpImgOptConfig.i18n && fpImgOptConfig.i18n.renameError) || 'Errore.') + ' ' + (p && p.data && p.data.message ? p.data.message : '');
-                            alert(errMsg);
+                            setRenameFeedback(btn, errMsg, 'error');
                             btn.disabled = false;
                             btn.innerHTML = origHtml;
                         }
                     })
                     .catch(function () {
-                        alert((fpImgOptConfig.i18n && fpImgOptConfig.i18n.renameError) || 'Errore di rete.');
+                        setRenameFeedback(btn, (fpImgOptConfig.i18n && fpImgOptConfig.i18n.renameError) || 'Errore di rete.', 'error');
                         btn.disabled = false;
                         btn.innerHTML = origHtml;
                     });

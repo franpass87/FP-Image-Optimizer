@@ -251,6 +251,8 @@ final class Plugin {
                 'bulkBackgroundOk' => __('Bulk avviato in background. Esegue un batch ogni minuto.', 'fp-imgopt'),
                 'renameConfirm'    => __('Rinominare le immagini di questo contenuto?', 'fp-imgopt'),
                 'renameSuccess'    => __('Immagini rinominate.', 'fp-imgopt'),
+                'renameNothingToDo'=> __('Nessuna immagine da rinominare: sono già nel formato corretto.', 'fp-imgopt'),
+                'renameAllDone'    => __('Tutte già rinominate', 'fp-imgopt'),
                 'renameError'      => __('Errore durante il rinomina.', 'fp-imgopt'),
             ],
         ]);
@@ -689,7 +691,7 @@ final class Plugin {
             $path = get_attached_file($aid);
             if ($path && is_file($path)) {
                 $bn = pathinfo($path, PATHINFO_FILENAME);
-                if (!(bool) preg_match('/^.+-' . $aid . '$/', $bn)) {
+                if (!(bool) preg_match('/^.+-' . $aid . '(?:-\d+)?$/', $bn)) {
                     $to_rename[] = $aid;
                 }
             }

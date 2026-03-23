@@ -347,7 +347,8 @@ final class ImageRenamer {
      * Evita doppio rename: se il filename è già nel formato sitename-slug-id.
      */
     private function already_renamed(string $basename, int $attachment_id): bool {
-        return (bool) preg_match('/^.+-' . $attachment_id . '$/', $basename);
+        // Considera validi anche i filename univoci creati da WP: ...-ID-1, ...-ID-2, ecc.
+        return (bool) preg_match('/^.+-' . $attachment_id . '(?:-\d+)?$/', $basename);
     }
 
     /**

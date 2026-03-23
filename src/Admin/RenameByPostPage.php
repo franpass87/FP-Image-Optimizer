@@ -88,7 +88,7 @@ final class RenameByPostPage {
                                 $path = get_attached_file($aid);
                                 if ($path && is_file($path)) {
                                     $bn = pathinfo($path, PATHINFO_FILENAME);
-                                    if (!(bool) preg_match('/^.+-' . $aid . '$/', $bn)) {
+                                    if (!(bool) preg_match('/^.+-' . $aid . '(?:-\d+)?$/', $bn)) {
                                         $to_rename[] = $aid;
                                     }
                                 }

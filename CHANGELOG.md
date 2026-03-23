@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.7.2] - 2026-03-23
+
+### Fixed
+
+- Rinomina per contenuto: il conteggio "da rinominare" considera anche i filename univoci WordPress con suffisso numerico (`...-ID-1`, `...-ID-2`), evitando che resti bloccato su "1 da rinominare".
+
+### Changed
+
+- Admin UI rinomina contenuto: feedback inline nella riga (senza alert bloccanti) con aggiornamento immediato dello stato.
+
 ## [1.7.1] - 2026-03-23
 
 ### Changed

@@ -60,6 +60,8 @@ final class Plugin {
 
     private function register_hooks(): void {
         add_action('admin_menu', [$this, 'register_admin_menu']);
+        add_action('admin_bar_menu', [$this, 'register_admin_bar_links'], 80);
+        add_filter('admin_body_class', [$this, 'add_admin_body_class']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
         add_action('wp_ajax_fp_imgopt_convert', [$this, 'ajax_convert']);
         add_action('wp_ajax_fp_imgopt_bulk_convert', [$this, 'ajax_bulk_convert']);
@@ -153,6 +155,45 @@ final class Plugin {
             RenameByPostPage::PAGE_SLUG,
             [new RenameByPostPage($this->settings), 'render']
         );
+    }
+
+    /**
+     * Link rapidi nella admin bar.
+     */
+    public function register_admin_bar_links(\WP_Admin_Bar $admin_bar): void {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+        $screen    = get_current_screen();
+        $screen_id = $screen ? ($screen->id ?? '') : '';
+        $is_plugin_screen = str_contains($screen_id, 'fp-imgopt');
+        $admin_bar->add_node([
+            'id'    => 'fp-imgopt',
+            'title' => __('FP Image Optimizer', 'fp-imgopt'),
+            'href'  => admin_url('admin.php?page=fp-imgopt'),
+            'meta'  => $is_plugin_screen ? ['aria-current' => 'page'] : [],
+        ]);
+        $admin_bar->add_node([
+            'id'     => 'fp-imgopt-rename',
+            'parent' => 'fp-imgopt',
+            'title'  => __('Rinomina per contenuto', 'fp-imgopt'),
+            'href'   => admin_url('admin.php?page=' . RenameByPostPage::PAGE_SLUG),
+        ]);
+    }
+
+    /**
+     * Aggiunge classe body per pagine del plugin.
+     */
+    public function add_admin_body_class(string $classes): string {
+        $screen = get_current_screen();
+        if (!$screen) {
+            return $classes;
+        }
+        $screen_id = $screen->id ?? '';
+        if (str_contains($screen_id, 'fp-imgopt') && !str_contains($classes, 'fpimgopt-admin-shell')) {
+            $classes .= ' fpimgopt-admin-shell';
+        }
+        return $classes;
     }
 
     /**

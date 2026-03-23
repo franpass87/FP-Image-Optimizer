@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.1] - 2026-03-23
+
+### Changed
+
+- Menu admin: link rapidi nella admin bar e body class `fpimgopt-admin-shell` (pattern FP-Experiences).
+
 ## [1.7.0] - 2026-03-22
 
 ### Added

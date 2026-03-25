@@ -342,6 +342,19 @@ final class ImageConverter {
     }
 
     /**
+     * Converte un'immagine GD a tavolozza in truecolor (richiesto da imagewebp / imageavif su PHP/GD).
+     */
+    private function ensure_gd_truecolor(\GdImage $image): void {
+        if (! function_exists('imageistruecolor') || ! function_exists('imagepalettetotruecolor')) {
+            return;
+        }
+        if (imageistruecolor($image)) {
+            return;
+        }
+        @imagepalettetotruecolor($image);
+    }
+
+    /**
      * @param \GdImage|\Imagick $image
      */
     private function save_webp(mixed $image, string $path): bool {
@@ -358,7 +371,9 @@ final class ImageConverter {
         }
 
         if ($image instanceof \GdImage) {
-            return (bool) imagewebp($image, $path, $quality);
+            $this->ensure_gd_truecolor($image);
+
+            return (bool) @imagewebp($image, $path, $quality);
         }
 
         return false;
@@ -381,7 +396,9 @@ final class ImageConverter {
         }
 
         if ($image instanceof \GdImage && function_exists('imageavif')) {
-            return (bool) imageavif($image, $path, $quality, 6);
+            $this->ensure_gd_truecolor($image);
+
+            return (bool) @imageavif($image, $path, $quality, 6);
         }
 
         return false;

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.9] - 2026-03-25
+
+### Fixed
+
+- **GD WebP/AVIF**: immagini a tavolozza convertite in truecolor con `imagepalettetotruecolor` prima di `imagewebp` / `imageavif`, eliminando warning PHP «Palette image not supported» su PNG/GIF indicizzati.
+
 ## [1.7.8] - 2026-03-25
 
 ### Fixed

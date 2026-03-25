@@ -1,6 +1,6 @@
 # FP Image Optimizer
 
-![Version](https://img.shields.io/badge/version-1.7.8-blue.svg)
+![Version](https://img.shields.io/badge/version-1.7.9-blue.svg)
 
 Plugin WordPress che converte le immagini della Media Library in **WebP** e **AVIF** per ridurre il peso e migliorare le performance di caricamento.
 

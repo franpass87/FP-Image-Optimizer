@@ -188,7 +188,8 @@ final class Plugin {
         if (!current_user_can('manage_options')) {
             return;
         }
-        $screen    = get_current_screen();
+        // Global WP function + frontend: screen API non è sempre caricata.
+        $screen    = function_exists('get_current_screen') ? \get_current_screen() : null;
         $screen_id = $screen ? ($screen->id ?? '') : '';
         $is_plugin_screen = str_contains($screen_id, 'fp-imgopt');
         $admin_bar->add_node([
@@ -209,7 +210,7 @@ final class Plugin {
      * Aggiunge classe body per pagine del plugin.
      */
     public function add_admin_body_class(string $classes): string {
-        $screen = get_current_screen();
+        $screen = \get_current_screen();
         if (!$screen) {
             return $classes;
         }

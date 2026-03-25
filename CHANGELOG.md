@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.7.8] - 2026-03-25
+
+### Fixed
+
+- **Bulk «solo mancanti» (AJAX)**: se un blocco da 100 allegati era già tutto convertito, la risposta segnalava erroneamente fine corsa e l’offset non avanzava — immagini senza varianti più avanti (per ID) non venivano raggiunte.
+- **Bulk «solo mancanti» (cron)**: stessa correzione per pagine vuote dopo il filtro; chiusura corretta quando l’ultima pagina ha meno di 100 risultati e nessun candidato (evita offset che «salta» allegati o cicli inutili).
+- **Paginazione bulk/cron**: con «solo mancanti» l’offset avanza in base al numero di allegati effettivamente letti dalla query (`$raw_count`), non sempre pari a 100 — ultima pagina parziale allineata.
+- **Riprova errori**: il log non viene più svuotato del tutto; restano solo gli allegati ancora in errore dopo il retry.
+- **Disinstallazione**: `wp_clear_scheduled_hook('fp_imgopt_bulk_cron')` per evitare eventi cron orfani.
+
 ## [1.7.7] - 2026-03-25
 
 ### Fixed

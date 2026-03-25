@@ -44,4 +44,31 @@ final class FailedLog {
     public static function clear(): void {
         delete_option(self::OPTION_KEY);
     }
+
+    /**
+     * Sostituisce l’intero log (es. dopo «Riprova» mantenendo solo errori ancora presenti).
+     *
+     * @param array<int, array{attachment_id: int, message: string, timestamp?: int}> $entries
+     */
+    public static function set(array $entries): void {
+        $clean = [];
+        foreach ($entries as $e) {
+            if (!is_array($e) || empty($e['attachment_id'])) {
+                continue;
+            }
+            $clean[] = [
+                'attachment_id' => (int) $e['attachment_id'],
+                'message'       => (string) ($e['message'] ?? ''),
+                'timestamp'     => (int) ($e['timestamp'] ?? time()),
+            ];
+            if (count($clean) >= self::MAX_ENTRIES) {
+                break;
+            }
+        }
+        if ($clean === []) {
+            delete_option(self::OPTION_KEY);
+            return;
+        }
+        update_option(self::OPTION_KEY, $clean);
+    }
 }

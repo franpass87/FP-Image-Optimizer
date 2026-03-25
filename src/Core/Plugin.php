@@ -373,6 +373,7 @@ final class Plugin {
                 'fields'         => 'ids',
                 'no_found_rows'  => true,
             ]);
+            $raw_count = count($ids);
 
             if ($only_missing && !empty($ids)) {
                 $ids = array_values(array_filter($ids, fn (int $id) => !$this->attachment_has_variants($id)));
@@ -380,6 +381,18 @@ final class Plugin {
             }
 
             if (empty($ids)) {
+                // Con «solo mancanti»: una pagina piena già tutta convertita va solo saltata (avanzamento offset),
+                // altrimenti il bulk si interrompe senza raggiungere ID successivi con varianti assenti.
+                if ($only_missing && $raw_count === $fetch_limit) {
+                    wp_send_json_success([
+                        'processed' => 0,
+                        'converted' => 0,
+                        'failed'    => 0,
+                        'has_more'  => true,
+                        'next'      => $offset + $raw_count,
+                    ]);
+                    return;
+                }
                 wp_send_json_success([
                     'processed' => 0,
                     'converted' => 0,
@@ -387,6 +400,7 @@ final class Plugin {
                     'has_more'  => false,
                     'next'      => $offset,
                 ]);
+                return;
             }
 
             $converter = new ImageConverter($this->settings);
@@ -408,7 +422,9 @@ final class Plugin {
 
             $this->invalidate_stats_cache();
 
-            $consumed = $only_missing ? $fetch_limit : count($ids);
+            // Con «solo mancanti» l’offset WP va avanzato del numero di allegati letti dalla query ($raw_count),
+            // non sempre di $fetch_limit — altrimenti nell’ultima pagina (< 100) si saltano ID non elaborati.
+            $consumed = $only_missing ? $raw_count : count($ids);
             wp_send_json_success([
                 'processed' => count($ids),
                 'converted' => $converted,
@@ -700,6 +716,7 @@ final class Plugin {
         $ids = array_unique($ids);
         $retried = 0;
         $converter = new ImageConverter($this->settings);
+        $still_failed = [];
 
         foreach ($ids as $attachment_id) {
             if ($attachment_id <= 0) {
@@ -709,10 +726,16 @@ final class Plugin {
             if (!is_wp_error($result) && (!empty($result['webp']) || !empty($result['avif']))) {
                 $retried++;
                 do_action('fp_imgopt_attachment_converted', $attachment_id, $result);
+            } elseif (is_wp_error($result)) {
+                $still_failed[] = [
+                    'attachment_id' => $attachment_id,
+                    'message'       => $result->get_error_message(),
+                    'timestamp'     => time(),
+                ];
             }
         }
 
-        FailedLog::clear();
+        FailedLog::set($still_failed);
         $this->invalidate_stats_cache();
         wp_send_json_success(['retried' => $retried, 'count' => count($ids)]);
     }
@@ -894,6 +917,7 @@ final class Plugin {
             'fields'         => 'ids',
             'no_found_rows'  => true,
         ]);
+        $raw_count = count($ids);
 
         if ($only_missing && !empty($ids)) {
             $ids = array_values(array_filter($ids, fn (int $id) => !$this->attachment_has_variants($id)));
@@ -903,6 +927,18 @@ final class Plugin {
         $processed = (int) ($state['processed'] ?? 0);
         $converted = (int) ($state['converted'] ?? 0);
         $failed    = (int) ($state['failed'] ?? 0);
+
+        if (empty($ids)) {
+            if ($only_missing && $raw_count === $fetch_limit) {
+                $state['offset'] = $offset + $raw_count;
+                update_option('fp_imgopt_bulk_state', $state);
+                wp_schedule_single_event(time() + 60, 'fp_imgopt_bulk_cron');
+                return;
+            }
+            delete_option('fp_imgopt_bulk_state');
+            $this->invalidate_stats_cache();
+            return;
+        }
 
         foreach ($ids as $attachment_id) {
             $result = $converter->convert_attachment((int) $attachment_id);
@@ -916,8 +952,8 @@ final class Plugin {
             $processed++;
         }
 
-        $consumed  = $only_missing ? $fetch_limit : count($ids);
-        $has_more  = $consumed === $fetch_limit;
+        $consumed   = $only_missing ? $raw_count : count($ids);
+        $has_more   = $consumed === $fetch_limit;
         $new_offset = $offset + $consumed;
 
         if ($has_more) {

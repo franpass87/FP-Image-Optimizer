@@ -13,6 +13,8 @@ if (!defined('WP_UNINSTALL_PLUGIN')) {
     exit;
 }
 
+wp_clear_scheduled_hook('fp_imgopt_bulk_cron');
+
 delete_option('fp_imgopt_settings');
 delete_option('fp_imgopt_failed_log');
 delete_option('fp_imgopt_bulk_state');

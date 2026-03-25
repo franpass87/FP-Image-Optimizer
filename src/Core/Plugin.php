@@ -34,6 +34,20 @@ final class Plugin {
         $this->settings = new Settings();
     }
 
+    /**
+     * Numero massimo di allegati processati per richiesta bulk (AJAX sincrono e cron in background).
+     * Default contenuto per ridurre timeout HTTP e risposte 503 su hosting con limiti stretti.
+     *
+     * Filtro: `fp_imgopt_bulk_batch_size` — intero tra 1 e 50 (consigliato 3–8).
+     *
+     * @return int
+     */
+    private function get_bulk_batch_size(): int {
+        $n = (int) apply_filters('fp_imgopt_bulk_batch_size', 5);
+
+        return max(1, min(50, $n));
+    }
+
     public function init(): void {
         $this->check_requirements();
         $this->register_hooks();
@@ -234,10 +248,11 @@ final class Plugin {
         $stats = get_transient('fp_imgopt_stats');
 
         wp_localize_script('fp-imgopt-admin', 'fpImgOptConfig', [
-            'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce'   => wp_create_nonce('fp_imgopt_admin'),
-            'stats'   => is_array($stats) ? $stats : null,
-            'i18n'    => [
+            'ajaxUrl'       => admin_url('admin-ajax.php'),
+            'nonce'         => wp_create_nonce('fp_imgopt_admin'),
+            'stats'         => is_array($stats) ? $stats : null,
+            'bulkBatchSize' => $this->get_bulk_batch_size(),
+            'i18n'          => [
                 'converting'   => __('Conversione in corso...', 'fp-imgopt'),
                 'done'         => __('Completato.', 'fp-imgopt'),
                 'error'        => __('Errore durante la conversione.', 'fp-imgopt'),
@@ -258,6 +273,7 @@ final class Plugin {
                 'ajaxSessionOrPerms'=> __('Sessione scaduta o permessi insufficienti. Ricarica la pagina e riprova.', 'fp-imgopt'),
                 'ajaxNotJson'      => __('Il server ha inviato HTML invece di JSON. Possibili cause: errore PHP, output prima della risposta (es. con WP_DEBUG), firewall o plugin di sicurezza. Controlla i log del sito.', 'fp-imgopt'),
                 'ajaxBadJson'      => __('Risposta JSON non valida dal server.', 'fp-imgopt'),
+                'ajaxOverload'     => __('Il server ha risposto con errore temporaneo (timeout o sovraccarico). Usa «Avvia in background» oppure chiedi all’hosting limiti più alti. Su siti lenti si può abbassare il batch con il filtro WordPress fp_imgopt_bulk_batch_size.', 'fp-imgopt'),
             ],
         ]);
     }
@@ -326,8 +342,13 @@ final class Plugin {
         }
 
         try {
+            if (function_exists('set_time_limit')) {
+                @set_time_limit(180);
+            }
+
             $offset       = max(0, absint($_REQUEST['offset'] ?? 0));
-            $limit        = min(50, max(1, absint($_REQUEST['limit'] ?? 20)));
+            $batch        = $this->get_bulk_batch_size();
+            $limit        = min($batch, max(1, absint($_REQUEST['limit'] ?? $batch)));
             $only_missing = !empty($_REQUEST['only_missing']);
 
             $fetch_limit = $only_missing ? 100 : $limit;
@@ -840,7 +861,7 @@ final class Plugin {
         }
 
         $offset       = (int) ($state['offset'] ?? 0);
-        $limit        = 20;
+        $limit        = $this->get_bulk_batch_size();
         $only_missing = !empty($state['only_missing']);
         $fetch_limit  = $only_missing ? 100 : $limit;
         $converter    = new ImageConverter($this->settings);

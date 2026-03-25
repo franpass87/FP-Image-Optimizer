@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.5] - 2026-03-25
+
+### Fixed
+
+- **Bulk optimizer / HTTP 503**: batch predefinito ridotto a **5 allegati** per richiesta (prima 20), con pausa **400 ms** tra una richiesta e la successiva; `set_time_limit(180)` sul bulk AJAX. Stesso batch per il cron «in background». Su hosting lenti o con proxy che chiude le richieste lunghe questo evita timeout e 503.
+- **Messaggio 502/503/504** in admin: testo dedicato (usa «Avvia in background», filtro `fp_imgopt_bulk_batch_size`).
+
+### Added
+
+- Filtro `fp_imgopt_bulk_batch_size` (default 5, max 50) per regolare allegati per batch.
+
 ## [1.7.4] - 2026-03-25
 
 ### Fixed

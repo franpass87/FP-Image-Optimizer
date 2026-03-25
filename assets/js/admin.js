@@ -25,10 +25,14 @@
                 throw new Error(locI18n.ajaxEmptyResponse || 'Risposta vuota dal server.');
             }
             if (t.charAt(0) !== '{' && t.charAt(0) !== '[') {
-                const authErr = response.status === 401 || response.status === 403;
-                let msg = authErr
-                    ? (locI18n.ajaxSessionOrPerms || 'Sessione scaduta o permessi insufficienti. Ricarica la pagina e riprova.')
-                    : (locI18n.ajaxNotJson || 'Il server ha inviato HTML invece di JSON. Possibili cause: errore PHP, output prima della risposta (es. con WP_DEBUG), firewall o plugin di sicurezza. Controlla i log del sito.');
+                let msg;
+                if (response.status === 401 || response.status === 403) {
+                    msg = locI18n.ajaxSessionOrPerms || 'Sessione scaduta o permessi insufficienti. Ricarica la pagina e riprova.';
+                } else if (response.status === 502 || response.status === 503 || response.status === 504) {
+                    msg = locI18n.ajaxOverload || 'Timeout o server temporaneamente non disponibile. Prova «Avvia in background» o riduci il batch (filtro fp_imgopt_bulk_batch_size).';
+                } else {
+                    msg = locI18n.ajaxNotJson || 'Il server ha inviato HTML invece di JSON. Possibili cause: errore PHP, output prima della risposta (es. con WP_DEBUG), firewall o plugin di sicurezza. Controlla i log del sito.';
+                }
                 if (response.status) {
                     msg += ' (HTTP ' + response.status + ')';
                 }
@@ -55,7 +59,9 @@
             }
 
             let offset = 0;
-            const limit = 20;
+            const limit = (typeof fpImgOptConfig.bulkBatchSize === 'number' && fpImgOptConfig.bulkBatchSize > 0)
+                ? fpImgOptConfig.bulkBatchSize
+                : 5;
             let totalProcessed = 0;
             let totalConverted = 0;
             let totalFailed = 0;
@@ -105,7 +111,7 @@
                             ' | Errori: ' + totalFailed;
 
                         if (data.has_more) {
-                            window.setTimeout(step, 150);
+                            window.setTimeout(step, 400);
                             return;
                         }
 

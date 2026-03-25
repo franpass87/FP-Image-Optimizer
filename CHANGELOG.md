@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.6] - 2026-03-25
+
+### Fixed
+
+- **Stabilità upload / errore critico**: `try/catch` su ogni conversione in `wp_generate_attachment_metadata` così un’eccezione Imagick/GD non blocca l’intero caricamento.
+- **Imagick**: dopo aver scritto il WebP si ricarica l’immagine da disco prima dell’AVIF (la stessa istanza Imagick usata per due formati poteva causare crash o stati inconsistenti).
+- **`free_image`**: gestione `null` e `try/catch` su `clear`/`destroy` Imagick.
+- **Limite megapixel** (filtro `fp_imgopt_max_source_pixels`, default 20M): salta conversione su sorgenti enormi per ridurre rischio esaurimento memoria; `0` = disabilita il limite.
+
 ## [1.7.5] - 2026-03-25
 
 ### Fixed

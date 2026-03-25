@@ -75,8 +75,15 @@ final class ImageConverter {
         }
 
         foreach ($files_to_convert as $path) {
-            if (is_file($path) && $this->is_supported_source($path)) {
+            if (!is_file($path) || !$this->is_supported_source($path)) {
+                continue;
+            }
+            try {
                 $this->convert_file($path);
+            } catch (\Throwable $e) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('[FP-IMGOPT] on_generate_metadata: ' . $path . ' | ' . $e->getMessage());
+                }
             }
         }
 
@@ -169,14 +176,22 @@ final class ImageConverter {
             return $result;
         }
 
+        $dims = @getimagesize($path);
+        if (!is_array($dims) || !isset($dims[0], $dims[1])) {
+            return $result;
+        }
+        $w = (int) $dims[0];
+        $h = (int) $dims[1];
+
         $min_dim = (int) $this->settings->get('skip_min_dimension', 0);
-        if ($min_dim > 0) {
-            $size = @getimagesize($path);
-            if (is_array($size) && isset($size[0], $size[1])) {
-                if ($size[0] < $min_dim || $size[1] < $min_dim) {
-                    return $result;
-                }
-            }
+        if ($min_dim > 0 && ($w < $min_dim || $h < $min_dim)) {
+            return $result;
+        }
+
+        /** @var int $max_px Filtro: 0 = nessun limite. Default riduce rischio memoria/fatal su upload enormi. */
+        $max_px = (int) apply_filters('fp_imgopt_max_source_pixels', 20_000_000);
+        if ($max_px > 0 && ($w * $h) > $max_px) {
+            return $result;
         }
 
         $do_webp = $this->settings->get('format_webp', true) && $this->supports_webp();
@@ -186,12 +201,14 @@ final class ImageConverter {
             return $result;
         }
 
-        $image = $this->load_image($path);
-        if (!$image) {
-            return $result;
-        }
+        $image = null;
 
         try {
+            $image = $this->load_image($path);
+            if (!$image) {
+                return $result;
+            }
+
             $base = pathinfo($path, PATHINFO_DIRNAME) . '/' . pathinfo($path, PATHINFO_FILENAME);
 
             if ($do_webp) {
@@ -207,7 +224,16 @@ final class ImageConverter {
                 }
             }
 
+            // Imagick: dopo WEBP lo stato interno può corrompersi; ricarica da disco prima di AVIF (evita crash/fatal).
             if ($do_avif) {
+                if ($image instanceof \Imagick && $do_webp) {
+                    $this->free_image($image);
+                    $image = $this->load_image($path);
+                    if (!$image) {
+                        return $result;
+                    }
+                }
+
                 $avif_path = $base . '.avif';
                 if ($this->is_valid_image_file($avif_path)) {
                     $result['avif'] = true;
@@ -218,6 +244,10 @@ final class ImageConverter {
                         @unlink($avif_path);
                     }
                 }
+            }
+        } catch (\Throwable $e) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[FP-IMGOPT] convert_file: ' . $path . ' | ' . $e->getMessage());
             }
         } finally {
             $this->free_image($image);
@@ -330,12 +360,19 @@ final class ImageConverter {
      * @param \GdImage|\Imagick $image
      */
     private function free_image(mixed $image): void {
+        if ($image === null) {
+            return;
+        }
         if ($image instanceof \GdImage) {
             imagedestroy($image);
         }
         if ($image instanceof \Imagick) {
-            $image->clear();
-            $image->destroy();
+            try {
+                $image->clear();
+                $image->destroy();
+            } catch (\Throwable) {
+                // Evita fatal in shutdown se Imagick è già in stato inconsistente.
+            }
         }
     }
 }

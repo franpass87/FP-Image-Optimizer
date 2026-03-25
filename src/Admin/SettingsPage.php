@@ -260,6 +260,7 @@ final class SettingsPage {
         <div class="fpimgopt-card-body">
             <p class="description"><?php echo esc_html__('Per convertire le immagini già presenti: vai su Media → Libreria, passa con il mouse su un\'immagine e clicca su "Converti in WebP/AVIF". Le immagini originali non vengono mai modificate o eliminate.', 'fp-imgopt'); ?></p>
             <p><?php echo esc_html__('Le nuove immagini caricate verranno convertite automaticamente se "Conversione al caricamento" è attiva.', 'fp-imgopt'); ?></p>
+            <p class="description"><?php echo esc_html__('In caso di timeout o errore HTTP 503, usa «Avvia in background» (elaborazione a cron, batch piccoli).', 'fp-imgopt'); ?></p>
             <div class="fpimgopt-bulk-options">
                 <label>
                     <input type="checkbox" id="fpimgopt-bulk-only-missing" value="1">

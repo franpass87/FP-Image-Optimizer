@@ -10,6 +10,7 @@
 ### Added
 
 - Filtro `fp_imgopt_bulk_batch_size` (default 5, max 50) per regolare allegati per batch.
+- Nota in pagina impostazioni: in caso di 503 usare «Avvia in background».
 
 ## [1.7.4] - 2026-03-25
 

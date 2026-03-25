@@ -48,6 +48,16 @@ final class Plugin {
         return max(1, min(50, $n));
     }
 
+    /**
+     * Verifica che il file allegato sia sotto la cartella uploads (coerente su Windows / percorsi misti).
+     */
+    private function is_attachment_path_in_uploads(string $path, string $base_dir): bool {
+        $base = trailingslashit(wp_normalize_path(realpath($base_dir) ?: $base_dir));
+        $p    = wp_normalize_path(realpath($path) ?: $path);
+
+        return $base !== '/' && str_starts_with($p, $base);
+    }
+
     public function init(): void {
         $this->check_requirements();
         $this->register_hooks();
@@ -495,7 +505,7 @@ final class Plugin {
 
         foreach ($ids as $attachment_id) {
             $path = get_attached_file((int) $attachment_id);
-            if (!$path || !is_file($path) || strpos($path, $base_dir) !== 0) {
+            if (!$path || !is_file($path) || !$this->is_attachment_path_in_uploads($path, $base_dir)) {
                 continue;
             }
 
@@ -679,8 +689,15 @@ final class Plugin {
             wp_send_json_error(['message' => __('Permessi insufficienti.', 'fp-imgopt')], 403);
         }
 
-        $log    = FailedLog::get();
-        $ids    = array_unique(array_map(fn (array $e) => (int) $e['attachment_id'], $log));
+        $log = FailedLog::get();
+        $ids = [];
+        foreach ($log as $entry) {
+            if (!is_array($entry) || empty($entry['attachment_id'])) {
+                continue;
+            }
+            $ids[] = (int) $entry['attachment_id'];
+        }
+        $ids = array_unique($ids);
         $retried = 0;
         $converter = new ImageConverter($this->settings);
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.7.7] - 2026-03-25
+
+### Fixed
+
+- **Percorsi uploads**: controlli `strpos`/`realpath` sostituiti con `wp_normalize_path` + `trailingslashit` + `str_starts_with` in `ImageConverter`, `VariantRemover` e `compute_stats` — evita falsi negativi su Windows (slash misti) e prefissi ambigui (es. `uploads` vs `uploads-extra`).
+- **Metadata upload**: se `file` nei metadata è vuoto o non stringa, si esce subito da `on_generate_metadata` (evita percorsi relativi errati).
+- **PictureReplacer**: non duplica `loading` / `decoding` se già presenti sull’`<img>`.
+- **Riprova log**: parsing difensivo delle voci log (evita TypeError se l’opzione è corrotta).
+- **Performance**: cache per richiesta di `supports_webp()` / `supports_avif()` (meno chiamate a `Imagick::queryFormats()` durante batch).
+
+### Removed
+
+- Costante inutilizzata `SUPPORTED_SOURCE` in `ImageConverter`.
+
 ## [1.7.6] - 2026-03-25
 
 ### Fixed

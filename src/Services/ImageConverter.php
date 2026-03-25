@@ -15,12 +15,26 @@ use WP_Error;
  */
 final class ImageConverter {
 
-    private const SUPPORTED_SOURCE = ['image/jpeg', 'image/png', 'image/gif'];
-
     private Settings $settings;
+
+    /** @var bool|null Cache per richiesta (queryFormats Imagick è costosa). */
+    private ?bool $supports_webp_cache = null;
+
+    /** @var bool|null */
+    private ?bool $supports_avif_cache = null;
 
     public function __construct(Settings $settings) {
         $this->settings = $settings;
+    }
+
+    /**
+     * Verifica che il percorso sia sotto la cartella upload (anti path traversal; slash Windows/Unix).
+     */
+    private function is_path_under_upload_base(string $path, string $base_dir): bool {
+        $base = trailingslashit(wp_normalize_path(realpath($base_dir) ?: $base_dir));
+        $p    = wp_normalize_path(realpath($path) ?: $path);
+
+        return $base !== '/' && str_starts_with($p, $base);
     }
 
     /**
@@ -35,23 +49,25 @@ final class ImageConverter {
             return $metadata;
         }
 
+        $file_rel = $metadata['file'] ?? '';
+        if (!is_string($file_rel) || $file_rel === '' || str_contains($file_rel, '..')) {
+            return $metadata;
+        }
+
         $upload_dir = wp_upload_dir();
         if (!empty($upload_dir['error'])) {
             return $metadata;
         }
         $base_dir  = trailingslashit($upload_dir['basedir']);
-        $base_real = realpath($base_dir) ?: $base_dir;
-        $rel_dir   = dirname($metadata['file'] ?? '') . '/';
+        $rel_dir   = dirname($file_rel) . '/';
 
         $files_to_convert = [];
 
-        if (!empty($metadata['file']) && !str_contains($metadata['file'], '..')) {
-            $main_path = $base_dir . $metadata['file'];
-            if (is_file($main_path)) {
-                $main_real = realpath($main_path);
-                if ($main_real && strpos($main_real, $base_real) === 0) {
-                    $files_to_convert[$main_real] = $main_path;
-                }
+        $main_path = $base_dir . $file_rel;
+        if (is_file($main_path)) {
+            $main_real = realpath($main_path);
+            if ($main_real && $this->is_path_under_upload_base($main_path, $base_dir)) {
+                $files_to_convert[$main_real] = $main_path;
             }
         }
         if (!empty($metadata['sizes']) && is_array($metadata['sizes'])) {
@@ -67,7 +83,7 @@ final class ImageConverter {
                 $size_path = $base_dir . $rel_dir . $sf;
                 if (is_file($size_path)) {
                     $size_real = realpath($size_path);
-                    if ($size_real && strpos($size_real, $base_real) === 0 && !isset($files_to_convert[$size_real])) {
+                    if ($size_real && $this->is_path_under_upload_base($size_path, $base_dir) && !isset($files_to_convert[$size_real])) {
                         $files_to_convert[$size_real] = $size_path;
                     }
                 }
@@ -112,15 +128,16 @@ final class ImageConverter {
         }
 
         $base_dir  = trailingslashit($upload_dir['basedir']);
-        $base_real = realpath($base_dir) ?: $base_dir;
         $rel_dir   = dirname($metadata['file'] ?? '') . '/';
 
         $result = ['webp' => false, 'avif' => false];
         $seen   = [];
 
-        $path_real = realpath($path);
-        if ($path_real && strpos($path_real, $base_real) === 0) {
-            $seen[$path_real] = true;
+        if ($this->is_path_under_upload_base($path, $base_dir)) {
+            $path_real = realpath($path);
+            if ($path_real) {
+                $seen[$path_real] = true;
+            }
             if (is_file($path) && $this->is_supported_source($path)) {
                 $r = $this->convert_file($path);
                 if ($r['webp'] ?? false) {
@@ -147,7 +164,7 @@ final class ImageConverter {
                     continue;
                 }
                 $file_real = realpath($file);
-                if (!$file_real || strpos($file_real, $base_real) !== 0 || isset($seen[$file_real])) {
+                if (!$file_real || !$this->is_path_under_upload_base($file, $base_dir) || isset($seen[$file_real])) {
                     continue;
                 }
                 $seen[$file_real] = true;
@@ -266,19 +283,33 @@ final class ImageConverter {
     }
 
     public function supports_webp(): bool {
+        if ($this->supports_webp_cache !== null) {
+            return $this->supports_webp_cache;
+        }
         if (extension_loaded('imagick')) {
             $formats = \Imagick::queryFormats();
-            return in_array('WEBP', $formats, true);
+            $this->supports_webp_cache = in_array('WEBP', $formats, true);
+
+            return $this->supports_webp_cache;
         }
-        return function_exists('imagewebp');
+        $this->supports_webp_cache = function_exists('imagewebp');
+
+        return $this->supports_webp_cache;
     }
 
     public function supports_avif(): bool {
+        if ($this->supports_avif_cache !== null) {
+            return $this->supports_avif_cache;
+        }
         if (extension_loaded('imagick')) {
             $formats = \Imagick::queryFormats();
-            return in_array('AVIF', $formats, true);
+            $this->supports_avif_cache = in_array('AVIF', $formats, true);
+
+            return $this->supports_avif_cache;
         }
-        return function_exists('imageavif');
+        $this->supports_avif_cache = function_exists('imageavif');
+
+        return $this->supports_avif_cache;
     }
 
     /**

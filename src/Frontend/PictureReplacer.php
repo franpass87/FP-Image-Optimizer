@@ -134,12 +134,22 @@ final class PictureReplacer {
             return $full;
         }
 
+        $attrs_tail = $before . $after;
+        $lazy       = '';
+        if (!preg_match('/\sloading\s*=/i', $attrs_tail)) {
+            $lazy .= ' loading="lazy"';
+        }
+        if (!preg_match('/\sdecoding\s*=/i', $attrs_tail)) {
+            $lazy .= ' decoding="async"';
+        }
+
         $picture = sprintf(
-            '<picture>%s<img%ssrc="%s"%s loading="lazy" decoding="async"></picture>',
+            '<picture>%s<img%ssrc="%s"%s%s></picture>',
             $sources,
             $before,
             esc_url($src),
-            $after
+            $after,
+            $lazy
         );
 
         return (string) apply_filters('fp_imgopt_picture_html', $picture, $src, $variants);

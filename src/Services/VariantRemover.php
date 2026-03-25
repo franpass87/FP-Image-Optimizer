@@ -32,13 +32,12 @@ final class VariantRemover {
         }
 
         $base_dir   = trailingslashit($upload_dir['basedir']);
-        $base_real  = realpath($base_dir) ?: $base_dir;
         $deleted    = 0;
         $errors     = 0;
         $seen_paths = [];
 
         foreach ($ids as $attachment_id) {
-            $result = $this->remove_attachment_variants((int) $attachment_id, $base_dir, $base_real, $seen_paths);
+            $result = $this->remove_attachment_variants((int) $attachment_id, $base_dir, $seen_paths);
             $deleted += $result['deleted'];
             $errors  += $result['errors'];
         }
@@ -53,11 +52,10 @@ final class VariantRemover {
     private function remove_attachment_variants(
         int $attachment_id,
         string $base_dir,
-        string $base_real,
         array &$seen_paths
     ): array {
         $path = get_attached_file($attachment_id);
-        if (!$path || !is_file($path) || strpos(realpath($path) ?: $path, $base_real) !== 0) {
+        if (!$path || !is_file($path) || !$this->is_path_under_upload_base($path, $base_dir)) {
             return ['deleted' => 0, 'errors' => 0];
         }
 
@@ -118,5 +116,15 @@ final class VariantRemover {
         }
 
         return ['deleted' => $deleted, 'errors' => $errors];
+    }
+
+    /**
+     * Percorso allegato sotto uploads (normalizzato; evita prefissi ambigui tipo …/uploads vs …/uploads-extra).
+     */
+    private function is_path_under_upload_base(string $path, string $base_dir): bool {
+        $base = trailingslashit(wp_normalize_path(realpath($base_dir) ?: $base_dir));
+        $p    = wp_normalize_path(realpath($path) ?: $path);
+
+        return $base !== '/' && str_starts_with($p, $base);
     }
 }

@@ -254,6 +254,10 @@ final class Plugin {
                 'renameNothingToDo'=> __('Nessuna immagine da rinominare: sono già nel formato corretto.', 'fp-imgopt'),
                 'renameAllDone'    => __('Tutte già rinominate', 'fp-imgopt'),
                 'renameError'      => __('Errore durante il rinomina.', 'fp-imgopt'),
+                'ajaxEmptyResponse'=> __('Risposta vuota dal server.', 'fp-imgopt'),
+                'ajaxSessionOrPerms'=> __('Sessione scaduta o permessi insufficienti. Ricarica la pagina e riprova.', 'fp-imgopt'),
+                'ajaxNotJson'      => __('Il server ha inviato HTML invece di JSON. Possibili cause: errore PHP, output prima della risposta (es. con WP_DEBUG), firewall o plugin di sicurezza. Controlla i log del sito.', 'fp-imgopt'),
+                'ajaxBadJson'      => __('Risposta JSON non valida dal server.', 'fp-imgopt'),
             ],
         ]);
     }
@@ -321,65 +325,76 @@ final class Plugin {
             wp_send_json_error(['message' => __('Permessi insufficienti.', 'fp-imgopt')], 403);
         }
 
-        $offset       = max(0, absint($_REQUEST['offset'] ?? 0));
-        $limit        = min(50, max(1, absint($_REQUEST['limit'] ?? 20)));
-        $only_missing = !empty($_REQUEST['only_missing']);
+        try {
+            $offset       = max(0, absint($_REQUEST['offset'] ?? 0));
+            $limit        = min(50, max(1, absint($_REQUEST['limit'] ?? 20)));
+            $only_missing = !empty($_REQUEST['only_missing']);
 
-        $fetch_limit = $only_missing ? 100 : $limit;
-        $ids         = get_posts([
-            'post_type'      => 'attachment',
-            'post_status'    => 'inherit',
-            'post_mime_type' => ['image/jpeg', 'image/png', 'image/gif'],
-            'posts_per_page' => $fetch_limit,
-            'offset'         => $offset,
-            'orderby'        => 'ID',
-            'order'          => 'ASC',
-            'fields'         => 'ids',
-            'no_found_rows'  => true,
-        ]);
-
-        if ($only_missing && !empty($ids)) {
-            $ids = array_values(array_filter($ids, fn (int $id) => !$this->attachment_has_variants($id)));
-            $ids = array_slice($ids, 0, $limit);
-        }
-
-        if (empty($ids)) {
-            wp_send_json_success([
-                'processed' => 0,
-                'converted' => 0,
-                'failed'    => 0,
-                'has_more'  => false,
-                'next'      => $offset,
+            $fetch_limit = $only_missing ? 100 : $limit;
+            $ids         = get_posts([
+                'post_type'      => 'attachment',
+                'post_status'    => 'inherit',
+                'post_mime_type' => ['image/jpeg', 'image/png', 'image/gif'],
+                'posts_per_page' => $fetch_limit,
+                'offset'         => $offset,
+                'orderby'        => 'ID',
+                'order'          => 'ASC',
+                'fields'         => 'ids',
+                'no_found_rows'  => true,
             ]);
-        }
 
-        $converter = new ImageConverter($this->settings);
-        $converted = 0;
-        $failed    = 0;
-
-        foreach ($ids as $attachment_id) {
-            $result = $converter->convert_attachment((int) $attachment_id);
-            if (is_wp_error($result)) {
-                FailedLog::add((int) $attachment_id, $result->get_error_message());
-                $failed++;
-                continue;
+            if ($only_missing && !empty($ids)) {
+                $ids = array_values(array_filter($ids, fn (int $id) => !$this->attachment_has_variants($id)));
+                $ids = array_slice($ids, 0, $limit);
             }
-            if (!empty($result['webp']) || !empty($result['avif'])) {
-                $converted++;
-                do_action('fp_imgopt_attachment_converted', $attachment_id, $result);
+
+            if (empty($ids)) {
+                wp_send_json_success([
+                    'processed' => 0,
+                    'converted' => 0,
+                    'failed'    => 0,
+                    'has_more'  => false,
+                    'next'      => $offset,
+                ]);
             }
+
+            $converter = new ImageConverter($this->settings);
+            $converted = 0;
+            $failed    = 0;
+
+            foreach ($ids as $attachment_id) {
+                $result = $converter->convert_attachment((int) $attachment_id);
+                if (is_wp_error($result)) {
+                    FailedLog::add((int) $attachment_id, $result->get_error_message());
+                    $failed++;
+                    continue;
+                }
+                if (!empty($result['webp']) || !empty($result['avif'])) {
+                    $converted++;
+                    do_action('fp_imgopt_attachment_converted', $attachment_id, $result);
+                }
+            }
+
+            $this->invalidate_stats_cache();
+
+            $consumed = $only_missing ? $fetch_limit : count($ids);
+            wp_send_json_success([
+                'processed' => count($ids),
+                'converted' => $converted,
+                'failed'    => $failed,
+                'has_more'  => $consumed === $fetch_limit,
+                'next'      => $offset + $consumed,
+            ]);
+        } catch (\Throwable $e) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[FP-IMGOPT] ajax_bulk_convert: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+            }
+            wp_send_json_error([
+                'message' => (defined('WP_DEBUG') && WP_DEBUG)
+                    ? $e->getMessage()
+                    : __('Errore interno durante il bulk. Controlla i log del server.', 'fp-imgopt'),
+            ], 500);
         }
-
-        $this->invalidate_stats_cache();
-
-        $consumed = $only_missing ? $fetch_limit : count($ids);
-        wp_send_json_success([
-            'processed' => count($ids),
-            'converted' => $converted,
-            'failed'    => $failed,
-            'has_more'  => $consumed === $fetch_limit,
-            'next'      => $offset + $consumed,
-        ]);
     }
 
     /**

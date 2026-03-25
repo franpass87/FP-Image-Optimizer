@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.4] - 2026-03-25
+
+### Fixed
+
+- **AJAX admin**: parsing della risposta `admin-ajax.php` tramite testo + `JSON.parse` con messaggi in italiano se il server restituisce HTML (errore PHP, notice con `WP_DEBUG`, firewall, sessione scaduta) invece del JSON atteso — evita l’errore tecnico `Unexpected token '<'`.
+- **Bulk optimizer**: `ajax_bulk_convert` avvolto in `try/catch` su `\Throwable` con risposta JSON di errore e log in `WP_DEBUG`.
+
 ## [1.7.3] - 2026-03-23
 
 ### Changed

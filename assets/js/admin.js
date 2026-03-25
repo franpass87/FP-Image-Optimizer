@@ -10,6 +10,38 @@
 
     const { ajaxUrl, nonce, i18n } = fpImgOptConfig;
 
+    /**
+     * Legge la risposta admin-ajax come testo e la interpreta come JSON.
+     * Evita messaggi criptici ("Unexpected token '<'") quando il server risponde con HTML.
+     *
+     * @param {Response} response
+     * @return {Promise<*>}
+     */
+    function fpImgOptParseAjaxResponse(response) {
+        const locI18n = (typeof fpImgOptConfig !== 'undefined' && fpImgOptConfig.i18n) ? fpImgOptConfig.i18n : {};
+        return response.text().then(function (text) {
+            const t = (text || '').trim();
+            if (!t) {
+                throw new Error(locI18n.ajaxEmptyResponse || 'Risposta vuota dal server.');
+            }
+            if (t.charAt(0) !== '{' && t.charAt(0) !== '[') {
+                const authErr = response.status === 401 || response.status === 403;
+                let msg = authErr
+                    ? (locI18n.ajaxSessionOrPerms || 'Sessione scaduta o permessi insufficienti. Ricarica la pagina e riprova.')
+                    : (locI18n.ajaxNotJson || 'Il server ha inviato HTML invece di JSON. Possibili cause: errore PHP, output prima della risposta (es. con WP_DEBUG), firewall o plugin di sicurezza. Controlla i log del sito.');
+                if (response.status) {
+                    msg += ' (HTTP ' + response.status + ')';
+                }
+                throw new Error(msg);
+            }
+            try {
+                return JSON.parse(t);
+            } catch (ignore) {
+                throw new Error(locI18n.ajaxBadJson || 'Risposta JSON non valida dal server.');
+            }
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         const bulkBtn = document.getElementById('fpimgopt-bulk-start');
         const bulkStatus = document.getElementById('fpimgopt-bulk-status');
@@ -49,9 +81,7 @@
                     },
                     body: body.toString()
                 })
-                    .then(function (response) {
-                        return response.json();
-                    })
+                    .then(fpImgOptParseAjaxResponse)
                     .then(function (payload) {
                         if (!payload || !payload.success || !payload.data) {
                             throw new Error((payload && payload.data && payload.data.message) ? payload.data.message : (i18n.error || 'Errore'));
@@ -110,7 +140,7 @@
                 body.set('action', 'fp_imgopt_remove_variants');
                 body.set('nonce', nonce);
                 fetch(ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() })
-                    .then(function (r) { return r.json(); })
+                    .then(fpImgOptParseAjaxResponse)
                     .then(function (p) {
                         if (p && p.success) {
                             alert((i18n.removeSuccess || 'Varianti rimosse.') + ' ' + (p.data && p.data.deleted ? p.data.deleted + ' file eliminati.' : ''));
@@ -129,7 +159,7 @@
                 body.set('action', 'fp_imgopt_clear_log');
                 body.set('nonce', nonce);
                 fetch(ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() })
-                    .then(function (r) { return r.json(); })
+                    .then(fpImgOptParseAjaxResponse)
                     .then(function () { if (typeof location !== 'undefined') location.reload(); })
                     .finally(function () { clearLogBtn.disabled = false; });
             });
@@ -147,7 +177,7 @@
                 body.set('nonce', nonce);
                 if (onlyMissing && onlyMissing.checked) body.set('only_missing', '1');
                 fetch(ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() })
-                    .then(function (r) { return r.json(); })
+                    .then(fpImgOptParseAjaxResponse)
                     .then(function (p) {
                         if (p && p.success) {
                             bulkStatus.textContent = i18n.bulkBackgroundOk || 'Bulk avviato in background.';
@@ -156,7 +186,9 @@
                             bulkStatus.textContent = (i18n.error || 'Errore') + ': ' + (p && p.data && p.data.message ? p.data.message : '');
                         }
                     })
-                    .catch(function () { bulkStatus.textContent = (i18n.error || 'Errore') + ' di rete.'; })
+                    .catch(function (err) {
+                        bulkStatus.textContent = (i18n.error || 'Errore') + ': ' + (err && err.message ? err.message : 'di rete.');
+                    })
                     .finally(function () { bulkBgBtn.disabled = false; });
             });
         }
@@ -167,7 +199,7 @@
             body.set('action', 'fp_imgopt_bulk_state');
             body.set('nonce', nonce);
             fetch(ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() })
-                .then(function (r) { return r.json(); })
+                .then(fpImgOptParseAjaxResponse)
                 .then(function (p) {
                     const st = p && p.success ? p.data : null;
                     const el = document.getElementById('fpimgopt-bulk-status');
@@ -180,7 +212,8 @@
                     }
                     el.textContent = (i18n.bulkRunning || 'Bulk in corso...') + ' Processate: ' + (st.processed || 0) + ' | Convertite: ' + (st.converted || 0) + ' | Errori: ' + (st.failed || 0);
                     bulkPollingTimer = setTimeout(bulkStatusPolling, 4000);
-                });
+                })
+                .catch(function () { /* polling: ignora singoli errori di rete */ });
         }
 
         (function () {
@@ -190,14 +223,15 @@
             body.set('action', 'fp_imgopt_bulk_state');
             body.set('nonce', nonce);
             fetch(ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() })
-                .then(function (r) { return r.json(); })
+                .then(fpImgOptParseAjaxResponse)
                 .then(function (p) {
                     const st = p && p.success ? p.data : null;
                     if (st && st.offset !== undefined) {
                         el.textContent = (i18n.bulkRunning || 'Bulk in corso...') + ' Processate: ' + (st.processed || 0) + ' | Convertite: ' + (st.converted || 0) + ' | Errori: ' + (st.failed || 0);
                         bulkPollingTimer = setTimeout(bulkStatusPolling, 4000);
                     }
-                });
+                })
+                .catch(function () { /* stato iniziale: ignora */ });
         })();
 
         const retryBtn = document.getElementById('fpimgopt-retry-failed');
@@ -209,7 +243,7 @@
                 body.set('action', 'fp_imgopt_retry_failed');
                 body.set('nonce', nonce);
                 fetch(ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: body.toString() })
-                    .then(function (r) { return r.json(); })
+                    .then(fpImgOptParseAjaxResponse)
                     .then(function (p) {
                         if (p && p.success && typeof location !== 'undefined') location.reload();
                     })
@@ -247,7 +281,7 @@
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
                 body: body.toString()
             })
-                .then(function (r) { return r.json(); })
+                .then(fpImgOptParseAjaxResponse)
                 .then(function (payload) {
                     if (payload && payload.success && payload.data) {
                         const d = payload.data;
@@ -350,7 +384,7 @@
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
                     body: body.toString()
                 })
-                    .then(function (r) { return r.json(); })
+                    .then(fpImgOptParseAjaxResponse)
                     .then(function (p) {
                         if (p && p.success && p.data) {
                             var total = Number(p.data.total || 0);

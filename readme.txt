@@ -5,7 +5,7 @@ Tags: images, webp, avif, optimization, performance
 Requires at least: 6.0
 Tested up to: 6.4
 Requires PHP: 8.0
-Stable tag: 1.7.3
+Stable tag: 1.7.4
 License: Proprietary
 
 Converte le immagini della Media Library in WebP e AVIF per ridurre il peso e migliorare le performance.
@@ -29,6 +29,9 @@ FP Image Optimizer genera automaticamente varianti WebP e AVIF delle immagini ca
 
 == Changelog ==
 
+
+= 1.7.4 =
+* Fixed: messaggi chiari in admin quando admin-ajax restituisce HTML invece di JSON; try/catch sul bulk convert con errore JSON strutturato.
 
 = 1.7.3 =
 * Menu position 56.4 per ordine alfabetico FP.

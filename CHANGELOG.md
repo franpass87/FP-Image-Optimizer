@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.11] - 2026-03-25
+
+### Fixed
+
+- **WebP/AVIF (GD)**: se `imagepalettetotruecolor` non converte (PNG/GIF indicizzati “difficili”), duplicazione su canvas truecolor + `imagecopy` prima di `imagewebp` / `imageavif` — elimina i warning «Palette image not supported» rimasti dopo la 1.7.9.
+- **WebP/AVIF (Imagick)**: immagini a tavolozza passate a `IMGTYPE_TRUECOLORALPHA` prima della scrittura, quando i tipi sono disponibili nell’estensione.
+
 ## [1.7.10] - 2026-03-25
 
 ### Fixed

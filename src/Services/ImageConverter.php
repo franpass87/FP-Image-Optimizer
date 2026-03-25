@@ -342,16 +342,61 @@ final class ImageConverter {
     }
 
     /**
-     * Converte un'immagine GD a tavolozza in truecolor (richiesto da imagewebp / imageavif su PHP/GD).
+     * Restituisce un GdImage truecolor utilizzabile con imagewebp / imageavif (GD non supporta tavolozze).
+     *
+     * @return array{0: \GdImage|null, 1: bool} Coppia [risorsa, true se va distrutta con imagedestroy dopo l'uso].
      */
-    private function ensure_gd_truecolor(\GdImage $image): void {
-        if (! function_exists('imageistruecolor') || ! function_exists('imagepalettetotruecolor')) {
+    private function gd_as_truecolor_for_modern_formats(\GdImage $source): array {
+        if (function_exists('imageistruecolor') && imageistruecolor($source)) {
+            return [$source, false];
+        }
+        if (function_exists('imagepalettetotruecolor')) {
+            @imagepalettetotruecolor($source);
+            if (function_exists('imageistruecolor') && imageistruecolor($source)) {
+                return [$source, false];
+            }
+        }
+        $w = imagesx($source);
+        $h = imagesy($source);
+        if ($w <= 0 || $h <= 0) {
+            return [null, false];
+        }
+        $tc = imagecreatetruecolor($w, $h);
+        if ($tc === false) {
+            return [null, false];
+        }
+        imagealphablending($tc, false);
+        imagesavealpha($tc, true);
+        $transparent = imagecolorallocatealpha($tc, 0, 0, 0, 127);
+        imagefilledrectangle($tc, 0, 0, $w, $h, $transparent);
+        imagealphablending($tc, true);
+        imagecopy($tc, $source, 0, 0, 0, 0, $w, $h);
+
+        return [$tc, true];
+    }
+
+    /**
+     * Forza truecolor alpha su Imagick per tavolozze (WebP/AVIF spesso rifiutano IMGTYPE_PALETTE).
+     */
+    private function ensure_imagick_truecolor(\Imagick $image): void {
+        if (! defined('Imagick::IMGTYPE_TRUECOLORALPHA')) {
             return;
         }
-        if (imageistruecolor($image)) {
-            return;
+        try {
+            $type = $image->getImageType();
+            $palette_types = [];
+            foreach (['IMGTYPE_PALETTE', 'IMGTYPE_PALETTEMATTE', 'IMGTYPE_PALETTEALPHA'] as $const) {
+                $fqn = 'Imagick::' . $const;
+                if (defined($fqn)) {
+                    $palette_types[] = constant($fqn);
+                }
+            }
+            if ($palette_types !== [] && in_array($type, $palette_types, true)) {
+                $image->setImageType(\Imagick::IMGTYPE_TRUECOLORALPHA);
+            }
+        } catch (\Throwable) {
+            // Best effort: il salvataggio gestisce il fallimento.
         }
-        @imagepalettetotruecolor($image);
     }
 
     /**
@@ -362,6 +407,7 @@ final class ImageConverter {
 
         if ($image instanceof \Imagick) {
             try {
+                $this->ensure_imagick_truecolor($image);
                 $image->setImageFormat('WEBP');
                 $image->setImageCompressionQuality($quality);
                 return $image->writeImage($path);
@@ -371,9 +417,16 @@ final class ImageConverter {
         }
 
         if ($image instanceof \GdImage) {
-            $this->ensure_gd_truecolor($image);
+            [$gd_work, $dispose] = $this->gd_as_truecolor_for_modern_formats($image);
+            if ($gd_work === null) {
+                return false;
+            }
+            $ok = (bool) @imagewebp($gd_work, $path, $quality);
+            if ($dispose) {
+                imagedestroy($gd_work);
+            }
 
-            return (bool) @imagewebp($image, $path, $quality);
+            return $ok;
         }
 
         return false;
@@ -387,6 +440,7 @@ final class ImageConverter {
 
         if ($image instanceof \Imagick) {
             try {
+                $this->ensure_imagick_truecolor($image);
                 $image->setImageFormat('AVIF');
                 $image->setImageCompressionQuality($quality);
                 return $image->writeImage($path);
@@ -396,9 +450,16 @@ final class ImageConverter {
         }
 
         if ($image instanceof \GdImage && function_exists('imageavif')) {
-            $this->ensure_gd_truecolor($image);
+            [$gd_work, $dispose] = $this->gd_as_truecolor_for_modern_formats($image);
+            if ($gd_work === null) {
+                return false;
+            }
+            $ok = (bool) @imageavif($gd_work, $path, $quality, 6);
+            if ($dispose) {
+                imagedestroy($gd_work);
+            }
 
-            return (bool) @imageavif($image, $path, $quality, 6);
+            return $ok;
         }
 
         return false;

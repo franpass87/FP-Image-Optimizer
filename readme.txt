@@ -5,7 +5,7 @@ Tags: images, webp, avif, optimization, performance
 Requires at least: 6.0
 Tested up to: 6.4
 Requires PHP: 8.0
-Stable tag: 1.7.4
+Stable tag: 1.7.10
 License: Proprietary
 
 Converte le immagini della Media Library in WebP e AVIF per ridurre il peso e migliorare le performance.
@@ -29,9 +29,28 @@ FP Image Optimizer genera automaticamente varianti WebP e AVIF delle immagini ca
 
 == Changelog ==
 
+= 1.7.10 =
+* Fixed: fatal admin bar sul frontend (`get_current_screen`) per utenti loggati con toolbar.
+
+= 1.7.9 =
+* Fixed: GD — conversione palette→truecolor prima di WebP/AVIF (niente warning su immagini indicizzate).
+
+= 1.7.8 =
+* Fixed: bulk solo mancanti — avanzamento offset quando un blocco è già tutto convertito; offset basato su allegati letti; cron e ultima pagina; retry mantiene solo errori residui; uninstall pulisce cron bulk.
+
+= 1.7.7 =
+* Fixed: normalizzazione percorsi uploads (Windows); guard metadata file; picture senza doppio loading; log retry robusto; cache supporto WebP/AVIF.
+
+= 1.7.6 =
+* Fixed: try/catch per conversione su upload; Imagick ricaricato tra WebP e AVIF; free_image più sicuro; limite megapixel opzionale (filtro fp_imgopt_max_source_pixels).
+
+= 1.7.5 =
+* Fixed: bulk con batch più piccolo (default 5) e pausa tra richieste per evitare timeout/503; set_time_limit sul bulk AJAX; stesso batch per cron background.
+* Added: filtro fp_imgopt_bulk_batch_size (1–50).
+* Messaggi dedicati per errori HTTP 502/503/504.
 
 = 1.7.4 =
-* Fixed: fatal admin bar sul frontend (get_current_screen) per utenti loggati.
+* Fixed: messaggi chiari in admin quando admin-ajax restituisce HTML invece di JSON; try/catch sul bulk convert con errore JSON strutturato.
 
 = 1.7.3 =
 * Menu position 56.4 per ordine alfabetico FP.

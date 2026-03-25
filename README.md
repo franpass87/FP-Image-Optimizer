@@ -1,6 +1,6 @@
 # FP Image Optimizer
 
-![Version](https://img.shields.io/badge/version-1.7.4-blue.svg)
+![Version](https://img.shields.io/badge/version-1.7.10-blue.svg)
 
 Plugin WordPress che converte le immagini della Media Library in **WebP** e **AVIF** per ridurre il peso e migliorare le performance di caricamento.
 
@@ -71,6 +71,8 @@ FP-Image-Optimizer/
 | `fp_imgopt_variant_urls` | filter | `(array $variants, string $src)` — modifica gli URL delle varianti prima dell'output |
 | `fp_imgopt_picture_html` | filter | `(string $html, string $src, array $variants)` — modifica l'HTML finale del picture |
 | `fp_imgopt_attachment_converted` | action | `(int $attachment_id, array $result)` — eseguito dopo conversione singola o bulk |
+| `fp_imgopt_bulk_batch_size` | filter | `(int $size)` — allegati per batch bulk AJAX e cron (default **5**, max 50); alza solo su server potenti, abbassa (es. 3) se ricevi 503/timeout |
+| `fp_imgopt_max_source_pixels` | filter | `(int $max)` — se maggiore di 0, non convertire file la cui area in pixel supera questo valore (default **20.000.000**); **0** = nessun limite |
 
 ## Autore
 

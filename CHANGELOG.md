@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0] - 2026-05-21
+
+### Added
+
+- **API runtime diagnostics per FP Remote Bridge**: `src/Services/Diagnostics/RuntimeDiagnostics.php` + `api.php` con `fp_imgopt_get_runtime_diagnostics()` e `fp_imgopt_get_runtime_diagnostics_sections()`.
+- **8 sezioni read-only**: `optimization_context`, `conversion_summary`, `bulk_pipeline`, `settings`, `integrations`, `admin_health`, `cron`, `problems`.
+
 ## [1.7.11] - 2026-03-25
 
 ### Fixed
